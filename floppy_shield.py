@@ -110,24 +110,49 @@ def dumpMFM(mfm_buf, mc_buf):
     
             
 class data_separator:
-    def __init__(self, interval_buf, clk_spd =4e6, gain=0.01):
+    def __init__(self, interval_buf, clk_spd =4e6, high_gain=0.3, low_gain=0.01):
         self.interval_buf = interval_buf
         self.pos = 0
-        self.reset(clk_spd=clk_spd, gain=gain)
+        self.reset(clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)
+        missing_clock_c2 = (0x5224 & 0x7fff)  #  [0,1,0,1, 0,0,1,0, 0,0,1,0, 0,1,0,0]
+        missing_clock_a1 = (0x4489 & 0x7fff)  #  [0,1,0,0, 0,1,0,0, 1,0,0,0, 1,0,0,1]
+        pattern_ff       = (0x5555 & 0x7fff)
+        pattern_00       = (0xaaaa & 0x7fff)
+        self.missing_clock = [ missing_clock_c2, missing_clock_a1 ]
+        self.sync_pattern  = [ pattern_ff, pattern_00 ]
 
-    def set_gain(self, gain):
-        self.gain = gain
+    def set_gain(self, high_gain, low_gain):
+        self.high_gain = high_gain
+        self.low_gain = low_gain
 
-    def reset(self, clk_spd=4e6, gain=0.01):
+    def switch_gain(self, gain_mode):
+        if gain_mode == 1:
+            self.gain = self.high_gain
+        else:
+            self.gain = self.low_gain
+
+    def set_mode(self, mode):
+        """
+        Set data separator mode. Missing clock and 0x00 bit patterns will be cared when address-mark seeking mode.   
+        Args:
+          mode: 0=AM seeking, 1=Data reading (ignore missing clock and 0x00 patterns)
+        """
+        self.mode = mode
+
+    def reset(self, clk_spd=4e6, high_gain=0.3, low_gain=0.01):
         self.clock_speed   = clk_spd
         self.bit_cell      = 500e3    # 1/2MHz
         self.cell_size     = self.clock_speed / self.bit_cell
         self.cell_size_ref = self.cell_size
-        self.cell_size_max = self.cell_size * 1.1
-        self.cell_size_min = self.cell_size * 0.9
-        self.gain          = gain
+        self.cell_size_max = self.cell_size * 1.2
+        self.cell_size_min = self.cell_size * 0.8
         self.bit_stream    = []
-
+        self.mc_check      = 0      # C+D data for missing clock checking
+        self.set_gain(high_gain=high_gain, low_gain=low_gain)
+        self.switch_gain(0)         # low speed gain
+        self.set_mode(0)            # AM seeking
+        self.cd_stream     = 0      # C+D bitstream
+    
     def get_interval(self):
         if self.pos >= len(self.interval_buf):
             return -1
@@ -135,11 +160,12 @@ class data_separator:
         self.pos+=1
         return dt
 
-    def get_pulse(self):
+    def get_bit(self):
         while True:
-            if len(self.bit_stream)>0:
-                return self.bit_stream.pop(0)
-            interval = self.get_interval()   # interval = pulse interval in 'cell_size' unit
+            if len(self.bit_stream) > 0:
+                bit = self.bit_stream.pop(0)
+                return bit
+            interval = self.get_interval()   # interval = pulse interval in 'cell_size' unit (cell_size=2us in case of 2D/2DD)
             if interval == -1:
                 return -1
             int_interval = int(interval / self.cell_size + 0.5)
@@ -155,6 +181,25 @@ class data_separator:
             elif int_interval == 4:
                 self.bit_stream += [0, 0, 0, 1]
 
+    def get_byte(self):
+        data           = 0
+        read_bit_count = 0   # read bit count
+        while True:
+            bit = self.get_bit()
+            if bit == -1:
+                return -1, False
+            if read_bit_count % 2 == 1:
+                data = (data<<1) | bit   # stores only data bits (skip clock bits)
+            read_bit_count += 1
+            self.cd_stream = ((self.cd_stream<<1) | bit) & 0x7fff
+            if self.mode == 0 and (self.cd_stream in self.missing_clock):
+                return data, True        # missing clock detected
+            if self.mode == 0 and (self.cd_stream in self.sync_pattern):
+                self.switch_gain(1)    # Fast tracking mode to get syncronized with SYNC pattern
+            else:
+                self.switch_gain(0)
+            if read_bit_count >= 16:
+                return data, False       # 8 bit data read completed
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -162,6 +207,15 @@ class data_separator:
 
 
 def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
+    """
+    Decode bistream track data  
+    Args:
+      interval_buf : Bitstream buffer for a track (pulse interval buffer)
+      clk_spd : clock speed of the floppy capture shield (default = 4MHz = 4e6)
+      high_gain : data separator tracking gain for high speed (=address mark seeking) region
+      low_gain : data separator tracking gain for low speed (=data reading) region
+      log_level : 0=No message, 1=minimum message, 2=detailed message
+    """
     class State(Enum):
         IDLE       = 0
         CHECK_MARK = 1
@@ -174,66 +228,36 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
     mfm_buf = []
     mc_buf  = []
 
-    missing_clock_c2 = 0x5224  #  [0,1,0,1, 0,0,1,0, 0,0,1,0, 0,1,0,0]
-    missing_clock_a1 = 0x4489  #  [0,1,0,0, 0,1,0,0, 1,0,0,0, 1,0,0,1]
-    pattern_ff       = 0x5555
-    pattern_00       = 0x2aaa
-
     # Number of sectors successfully ( or error) read
     num_sect_read = 0
     num_sect_err  = 0
 
     state = State.IDLE
-    count = 0
+    read_count = 0
     id = []
     sector = []
     track = []
-    bit_stream      = 0
-    current_data    = 0
-    read_bit_count  = 0
-    data_valid_flag    = False
-    missing_clock_flag = False
-    ds = data_separator(interval_buf, clk_spd=clk_spd, gain=0)    # Clock / Data separator
+    ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     crc = CCITT_CRC()
 
+    ds.set_mode(0)      # AM seeking
+
     while True:
-        pulse = ds.get_pulse()
-        if pulse == -1:
+        ## Format parsing
+
+        # set data separator mode
+        if state == State.IDLE or state == State.CHECK_MARK:
+            ds.set_mode(0)      # AM seeking
+        else:
+            ds.set_mode(1)      # data reading
+
+        data, mc = ds.get_byte()
+        if data == -1:
             break
+        mfm_buf.append(data)
+        mc_buf.append(mc)
 
-        ## MFM decoding
-        bit_stream = ((bit_stream<<1) | pulse) & 0x7fff
-        if read_bit_count % 2 == 1:
-            current_data = ((current_data<<1) | pulse) & 0xff
-        read_bit_count += 1
-
-        # Check 'Missing clock bit pattern' only when sector data is not read
-        if state==State.IDLE or state ==State.CHECK_MARK:
-            if bit_stream == missing_clock_c2 or bit_stream == missing_clock_a1:
-                data_valid_flag    = True
-                missing_clock_flag = True
-                read_bit_count = 0
-        if state == State.IDLE:
-            if bit_stream == pattern_ff or bit_stream == pattern_00:
-                ds.set_gain(high_gain)  # High gain
-            else:
-                ds.set_gain(low_gain)   # Low gain
-
-        if read_bit_count >= 16:
-            data_valid_flag    = True
-
-        if data_valid_flag == False:
-            continue
-
-        read_bit_count = 0
-        mfm_buf.append(current_data)
-        mc_buf.append(missing_clock_flag)
-        mc = missing_clock_flag
-        data_valid_flag    = False
-        missing_clock_flag = False
-
-        ## Format parsing (State machine)
-        
+        # State machine
         if state == State.IDLE:
             if  mc== True:                  # found a missing clock
                 state = State.CHECK_MARK
@@ -241,13 +265,13 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
         elif state == State.CHECK_MARK:
             if mc == True:                  # Skip missing clock data
                 continue
-            elif current_data == 0xfc:      # Index AM
+            elif data == 0xfc:      # Index AM
                 state = State.INDEX
-            elif current_data == 0xfe:      # ID AM
+            elif data == 0xfe:      # ID AM
                 state = State.IDAM
-            elif current_data == 0xfb:      # Data AM
+            elif data == 0xfb:      # Data AM
                 state = State.DAM
-            elif current_data == 0xf8:      # Deleted Data AM
+            elif data == 0xf8:      # Deleted Data AM
                 state = State.DDAM
             else:
                 state = State.IDLE
@@ -258,14 +282,14 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
             state = State.IDLE
  
         elif state == State.IDAM:           # ID Address Mark
-            if count == 0:
+            if read_count == 0:
                 if log_level>0:
                     print('IDAM ', end='')
                 id = [ 0xfe ]
-                count = 4+2   # ID+CRC
-            id.append(current_data)
-            count -= 1
-            if count == 0:
+                read_count = 4+2   # ID+CRC
+            id.append(data)
+            read_count -= 1
+            if read_count == 0:
                 crc.reset()
                 crc.data(id)
                 id_ = id.copy()
@@ -288,31 +312,28 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
                 print('DAM ', end='')
             sector = [ 0xfb ]
             address_mark = True      # DM
-            count = [128, 256, 512, 1024][id[3] & 0x03]
-            count += 2   # for CRC
-            sector.append(current_data)
-            count -= 1
+            read_count = [128, 256, 512, 1024][id[3] & 0x03]
+            read_count += 2   # for CRC
             state = State.DATA_READ
 
         elif state == State.DDAM:            # Deleted Data Address Mark (Sector)
             if len(id)<4:
                 state = State.IDLE
                 continue
-            if count == 0:
+            if read_count == 0:
                 if log_level>0:
                     print('DDAM ', end='')
                 sector = [ 0xf8 ]
                 address_mark = False      # DDM
-                count = [128, 256, 512, 1024][id[3] & 0x03]
-                count += 2   # for CRC
-            sector.append(current_data)
-            count -= 1
+                read_count = [128, 256, 512, 1024][id[3] & 0x03]
+                read_count += 2   # for CRC
             state = State.DATA_READ
-            
-        elif state == State.DATA_READ:
-            sector.append(current_data)
-            count -= 1
-            if count == 0:
+ 
+        # Read sector data for DAM and DDAM
+        if state == State.DATA_READ:
+            sector.append(data)
+            read_count -= 1
+            if read_count == 0:
                 crc.reset()
                 crc.data(sector)
                 _sector = sector.copy()
@@ -332,13 +353,8 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
                         dump_list_hex(_sector)
                     track.append([id, False, sector, address_mark])
                 id=[]
-                ds.reset()
+                ds.reset(high_gain=high_gain, low_gain=low_gain)
                 state = State.IDLE
-
-        else:
-            if log_level>0:
-                print("**************WRONG STATE")
-            state = State.IDLE
 
     return track, mfm_buf, mc_buf, num_sect_read, num_sect_err
 
@@ -390,6 +406,9 @@ class d77_image:
             data >>= 8
 
     def set_track_table(self, hdr, track_num, data):
+        """
+        Set track offset to the offset table in the header of the d77 disk image
+        """
         pos = 0x20 + track_num*4
         self.set_dword(hdr, pos, data)
 
@@ -424,26 +443,26 @@ print(format(crc.get(), '04X'))
 # read a bitstream file
 #"""
 disk_data = 'putty/fb30.log'
-bs = bitstream()
-bs.open(disk_data)
+bs = bitstream(disk_data)
+#bs.open(disk_data)
 #bs.display_histogram(1,0)
 #"""
 
 # decode all tracks in an image
-"""
+#"""
 disk = []
 for track_id in bs.disk:
-    track, mfm_buf, mc_buf, sec_read, sec_err = decodeFormat(bs.disk[track_id], clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0)
-    #print(sec_read, sec_err)
+    track, mfm_buf, mc_buf, sec_read, sec_err = decodeFormat(bs.disk[track_id], clk_spd=4e6, high_gain=0., low_gain=0., log_level=0)
+    print(sec_read, sec_err)
     disk.append(track)
-"""
+#"""
 
 # track data dump
-#"""
+"""
 track_id = '0-0'
-track, mfm_buf, mc_buf, sec_read, sec_err = decodeFormat(bs.disk[track_id], clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0)
-dumpMFM(mfm_buf, mc_buf)
-#"""
+track, mfm_buf, mc_buf, sec_read, sec_err = decodeFormat(bs.disk[track_id], clk_spd=4e6, high_gain=0., low_gain=0., log_level=1)
+#dumpMFM(mfm_buf, mc_buf)
+"""
 
 # display pritable characters in a track
 """
@@ -455,9 +474,9 @@ for track in disk:
 """
 
 # D77 disk image generation
-"""
+#"""
 d77 = d77_image()
 img = d77.generate(disk)
-with open('disk_img.d77', 'wb') as f:
+with open('disk_img2.d77', 'wb') as f:
     f.write(img)
-"""
+#"""
