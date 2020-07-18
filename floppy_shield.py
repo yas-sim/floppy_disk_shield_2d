@@ -442,7 +442,7 @@ print(format(crc.get(), '04X'))
 
 # read a bitstream file
 #"""
-disk_data = 'putty/fb30.log'
+disk_data = 'putty/fb33l1.log'
 bs = bitstream(disk_data)
 #bs.open(disk_data)
 #bs.display_histogram(1,0)

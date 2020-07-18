@@ -59,7 +59,7 @@ class FDD {
     }
 
     void set_drive_mode(int mode) {
-      drive_mode = ENUM_DRV_MODE::mode_2d;      
+      drive_mode = mode;
     }
 
     void step(void) {
