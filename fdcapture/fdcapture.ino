@@ -390,10 +390,13 @@ void dumpTrack_encode(unsigned long bytes=0UL) {
       } else {
         if(count > 'z'-' ') count = 'z'-' ';
         str[0] = count + ' ';
+        if(chr_count % 100==0) {
+          Serial.print("~");    // Start line code
+        }
         Serial.print(str);
         count = 1;
         chr_count++;
-        if(chr_count>=100) {
+        if(chr_count % 100==99) {
           chr_count = 0;
           Serial.println(F(""));
         }
