@@ -22,7 +22,14 @@
 
 // This class changes the configuration of Timer 1 for disc rotate speed measurement purpose
 class FDD {
+  private:
+    int drive_mode;     // 0=2D, 1=2DD/2HD
   public:
+    enum ENUM_DRV_MODE {
+      mode_2d,
+      mode_2dd
+    };
+
     FDD() {
       //init();
     }
@@ -41,6 +48,8 @@ class FDD {
       digitalWrite(FD_DIR,        HIGH);  // - direction
       digitalWrite(FD_STEP,       HIGH);
 
+      set_drive_mode(0); // 2D
+
       motor(true);      // motor on
       head(true);       // head load on
       side(0);          // side 0
@@ -49,11 +58,18 @@ class FDD {
       side(0);
     }
 
+    void set_drive_mode(int mode) {
+      drive_mode = ENUM_DRV_MODE::mode_2d;      
+    }
+
     void step(void) {
-      digitalWrite(FD_STEP, LOW);
-      delay(10);
-      digitalWrite(FD_STEP, HIGH);
-      delay(10);
+      int iter = drive_mode==ENUM_DRV_MODE::mode_2dd ? 2 : 1;
+      for(int i=0; i<iter; i++) {
+        digitalWrite(FD_STEP, LOW);
+        delay(10);
+        digitalWrite(FD_STEP, HIGH);
+        delay(10);
+      }
     }
 
     void setStepDir(uint8_t dir) {
@@ -440,31 +456,6 @@ void histogram(unsigned long bytes=0UL) {
     Serial.println(histo[i]);
   }
 }
-
-
-void setup() {
-  // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
-  FDCap.init();
-  SPISRAM.init();
-
-  Serial.begin(115200);
-
-  FDD.init();                   // Motor on, Head load on
-  delay(500);
-  for (int i = 0; i < 20; i++) {
-    FDD.stepIn();
-  }
-  FDD.track00();
-
-  FDD.seek(0,2);
-  SPISRAM.clear();
-  Serial.println(F("START"));
-}
-
-
-
-
-
 // Calibrate motor speed
 void revolution_calibration(void) {
   while(1) {
@@ -537,6 +528,26 @@ void timing_light(int freq) {
     digitalWrite(CAP_ACTIVE, LOW);
     delay(period*0.8);
   }
+}
+
+
+void setup() {
+  // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
+  FDCap.init();
+  SPISRAM.init();
+
+  Serial.begin(115200);
+
+  FDD.init();                   // Motor on, Head load on
+  FDD.set_drive_mode(FDD::ENUM_DRV_MODE::mode_2dd);
+  delay(500);
+  for (int i = 0; i < 20; i++) {
+    FDD.stepIn();
+  }
+  FDD.track00();
+
+  FDD.seek(0,2);
+  SPISRAM.clear();
 }
 
 void loop() {
