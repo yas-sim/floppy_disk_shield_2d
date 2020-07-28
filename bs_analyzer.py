@@ -134,10 +134,20 @@ def mfm_dump(interval, args):
 
 #      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
 def id_dump(interval, args):
+    """
     print(' # : (C ,H ,R ,N ) STA MFM-POS')
-    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)    
+    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     for i, idam in enumerate(id_buf):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', idam[6]))
+    """
+    track, sec_read, sec_err = read_all_sectors(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    print(' # : (C ,H ,R ,N ) ID-CRC MFM-POS')
+    for i, sect in enumerate(track):
+        idam = sect[0]
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', 'DAM  ' if sect[3] else 'DDAM ', idam[6]))
+        # track = [[id_field, CRC status, sect_data, DAM],...]
+        #                            id_field = [ C, H, R, N, CRC status, ds_pos, mfm_pos]
+
 
 def generate_key(track):
     trk = track // 2

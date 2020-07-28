@@ -197,6 +197,7 @@ def decode_track(file):
                           index_data[-1][1]-index_data[-2][1],
                           index_data[-1][2]-index_data[-2][2]) 
                 """
+                """
                 if len(index_data)==2:
                     try:
                         spin_time = (index_data[-1][2]-index_data[-2][2]) * (1/ick)
@@ -205,6 +206,7 @@ def decode_track(file):
                         spin_time = 0
                         rpm = 0
                     print('{} RPM'.format(rpm))
+                """
                 prev_stream_position = stream_position
                 prev_sample_counter  = sample_counter
                 prev_index_counter   = index_counter
@@ -260,8 +262,9 @@ def encode(stream, f):
             count += 1
 
 
-def main(dir_name):
+def main(args):
     # Get all 'raw' files and sort them
+    dir_name = args.input
     files = glob.glob(dir_name+'/*.raw')
     files.sort()
     dirs = os.path.split(dir_name)
@@ -274,7 +277,7 @@ def main(dir_name):
         # Process all raw files in the directory
         for file in files:
             m = [ int(s) for s in re.findall(r'track(\d+)\.(\d)\.raw', file)[0] ]
-            print('track {} {}'.format(*m))
+            print('track {} {}  '.format(*m), end='', flush=True)
             f.write('**TRACK_READ {} {}\n'.format(*m))
             stream, stream_pos, index, sck = decode_track(file)     # parse KryoFlux raw stream data
             track = get_track(stream, stream_pos, index)            # Kryoflux stream buffer may contain track data for multiple spins. Extract the data of exact 1 track

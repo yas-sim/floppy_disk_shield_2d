@@ -223,7 +223,7 @@ class data_separator:
         return self.pos
     
     def set_pos(self, pos):
-        if pos<len(self.interval_buf):
+        if pos<len(self.interval_buf) and pos>0:
             self.pos = pos
     
     def get_bit(self):  # Does VFO tracking
@@ -326,10 +326,10 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
       low_gain : data separator tracking gain for low speed (=data reading) region
       log_level : 0=No message, 1=minimum message, 2=detailed message
     Returns:
-      id_buf : [ [C,H,R,N, CRC flag, ds_pos, mfm_pos], ...]  
-                      CRC flag = True:No error False:error  
+      id_buf = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
+                      ID-CRC flag = True:No error False:error  
                       ds_pos  = ID position in the interval buffer
-                      mfm_pos = IF position in the MFM buffer   
+                      mfm_pos = ID position in the MFM buffer   
     """
     class State(Enum):
         IDLE       = 0
@@ -342,6 +342,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
     
     ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     ds.set_mode(0)      # AM seeking
+    ds.set_pos(0)
 
     crc = CCITT_CRC()
 
@@ -400,7 +401,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
                 crc.reset()
                 crc.data(id_field)
                 id_ = id_field.copy()
-                id_field = id_field[1:-2]   # remove IDAM and CRC
+                id_field = id_field[1:]   # remove IDAM and CRC
                 if crc.get()==0:
                     id_buf.append(id_field + [True, id_ds_pos, id_mfm_pos-1])
                     if log_level>0:
@@ -428,7 +429,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
       low_gain : data separator tracking gain for low speed (=data reading) region
       log_level : 0=No message, 1=minimum message, 2=detailed message
     Return:  
-       (Status, CRC, Data, DAM/DDAM) : Status(False=Not found), CRC(False=Error), Data=sector data(list), DAM/DDAM(True=DAM)
+       (Status, Data-CRC, Data, DAM/DDAM) : Status(False=Not found), Data-CRC(False=Error), Data=sector data(list), DAM/DDAM(True=DAM)
     """
     class State(Enum):
         IDLE       = 0
@@ -488,29 +489,17 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
                 id_field = [ data ]
                 read_count = 4+2   # ID+CRC
                 state = State.IDAM
-            elif mc_byte == 0xc2 and data == 0xfc:      # Index AM
+            elif mc_byte == 0xc2 and data == 0xfc:  # Index AM
                 state = State.INDEX
-            elif data == 0xfb:      # Data AM
+            elif data == 0xfb or data == 0xf8:      # DataAM or DeletedDataAM
                 if len(id_field) < 4:
                     state = State.IDLE
-                elif id_field[2] == sect_num:   # check sector # match
+                elif id_field[2] == sect_num:       # check sector # match
                     if log_level>0:
-                        print('DAM ', end='')
+                        if data == 0xfb: print('DAM ', end='')
+                        else:            print('DDAM', end='')
                     sector = [ data ]
-                    address_mark = True       # DAM
-                    read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
-                    read_count += 2   # for CRC
-                    state = State.DATA_READ
-                else:
-                    state = State.IDLE
-            elif data == 0xf8:      # Deleted Data AM
-                if len(id_field) < 4:
-                    state = State.IDLE
-                elif id_field[2] == sect_num:   # check sector # match
-                    if log_level>0:
-                        print('DDAM ', end='')
-                    sector = [ data ]
-                    address_mark = False      # DDAM
+                    address_mark = True if data==0xfb else False  # DAM=True, DDAM=False
                     read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
                     read_count += 2   # for CRC
                     state = State.DATA_READ
@@ -530,16 +519,16 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
+                id_ = id_field.copy()
+                id_field = id_field[1:-2]   # remove IDAM and CRC
                 if crc.get()==0:
-                    id_field = id_field[1:-2]   # remove IDAM and CRC
                     if log_level>0:
                         print("CRC - OK ({:02x},{:02x},{:02x},{:02x})".format(id_field[0], id_field[1], id_field[2], id_field[3]))
                 else:
                     if log_level>0:
                         print("CRC - ERROR")
                     if log_level>1:
-                        dump_list_hex(id_field)
-                    id_field = []
+                        dump_list_hex(id_)
                 state = State.IDLE
 
         # Read sector data for DAM and DDAM
@@ -556,15 +545,14 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
                         print("CRC - OK")
                     if log_level>1:
                         dump_list_hex(_sector)
-                    return (True, True, sector, address_mark)  # Status, CRC, Data, DAM/DDAM
+                    return (True, True, sector, address_mark)  # Status, Data-CRC, Data, DAM/DDAM
                 else:
                     if log_level>0:
                         print("CRC - ERROR")
                     if log_level>1:
                         dump_list_hex(_sector)
-                    return (True, False, sector, address_mark)  # Status, CRC, Data, DAM/DDAM
-                #ds.reset(high_gain=high_gain, low_gain=low_gain)
-                #state = State.IDLE
+                    return (True, False, sector, address_mark)  # Status, Data-CRC, Data, DAM/DDAM
+
     return (False, False, [0], False)  # Status, CRC, Data, DAM/DDAM  (Sector not found)
 
 
@@ -573,8 +561,8 @@ def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, lo
     """
     Read all sector data in a track  
     Return:  
-      track : track = [[id_field, CRC status, sect_data, DAM],...]
-                                    id_field = [ C, H, R, N, CRC status, ds_pos, mfm_pos]
+      track : track = [[id_field, data-CRC_status, sect_data, DAM],...]
+                        id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
       num_read (int): number of sector read 
       num_error (int): number of sector read and caused error (CRC)
     """
@@ -588,16 +576,18 @@ def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, lo
     id_list = search_all_idam(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
     for id_field in id_list:
         sect    = id_field[2]
-        crc_err = id_field[4]
-        pos     = id_field[5]
-        if crc_err == False:  # Skip sector if ID field has CRC error
+        idcrc   = id_field[6]
+        pos     = id_field[7] # ds_pos
+        if idcrc == False:  # ID-CRC error but add ID to the data (to let the ID exist in the image)
             num_error += 1
+            track.append([id_field, False, [], True]) # ID, CRC=Err, Data, DAM=DAM
             continue
-        status, crc, sector, dam = read_sector(interval_buf, sect_num = sect, ds_pos = pos, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
-        if status == False:   # sector not found
+        status, datacrc, sector, dam = read_sector(interval_buf, sect_num = sect, ds_pos = pos, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
+        if status == False:   # record not found
             num_error += 1
+            track.append([id_field, False, [], True])  # ID, CRC, Data, DAM
             continue
-        if crc == False:      # CRC error
+        if datacrc == False:      # CRC error
             num_error += 1
             track.append([id_field, False, sector, dam])  # ID, CRC, Data, DAM
         else:
@@ -680,30 +670,18 @@ def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_le
                 state = State.IDAM
             elif mc_byte == 0xc2 and data == 0xfc:      # Index AM
                 state = State.INDEX
-            elif data == 0xfb:      # Data AM
+            elif data == 0xfb or data == 0xf8:      # Data AM
                 if len(id_field)<4:
                     state = State.IDLE
                     continue
                 if log_level>0:
-                    print('DAM ', end='')
-                sector = [ 0xfb ]
-                address_mark = True      # DM
+                    if data==0xfb: print('DAM ', end='')
+                    else:          print('DDAM', end='')
+                sector = [ data ]
+                address_mark = True if data==0xfb else False     # DAM=True, DDAM=False
                 read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
                 read_count += 2   # for CRC
                 state = State.DATA_READ
-            elif data == 0xf8:      # Deleted Data AM
-                if len(id_field)<4:
-                    state = State.IDLE
-                    continue
-                if log_level>0:
-                    print('DDAM ', end='')
-                sector = [ 0xf8 ]
-                address_mark = False      # DDM
-                read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
-                read_count += 2   # for CRC
-                state = State.DATA_READ
-            else:
-                state = State.IDLE
 
         elif state == State.INDEX:          # Index Address mark
             if log_level>0:
@@ -779,7 +757,7 @@ class d77_image:
         hdr[0x1b] = disk_type
         return hdr
 
-    def create_sector(self, sect_data, c, h, r, n, num_sec, density=0, am=0, status=0, pos=0):
+    def create_sector(self, sect_data, c, h, r, n, num_sec, density=0, am=0, status=0, ext_status=0, id_crc1=0, id_crc2=0, pos=0):
         """
         Args:
           sect_data (list): sector data
@@ -797,10 +775,12 @@ class d77_image:
                 density, 
                 am, 
                 status, 
-                0, 0, 0, 0, 0, 
+                0, 0,         # sector position (WORD) placeholder
+                ext_status, 
+                id_crc1, id_crc2,
                 sect_size  % 0x100, 
                 sect_size // 0x100 ])
-        self.set_word(sect, 9, pos)
+        self.set_word(sect, 0x09, pos)
         sect += bytearray(sect_data)
         return sect
 
@@ -868,23 +848,37 @@ class d77_image:
                     img += buf
                     track_num += 1
 
-
         # Sector data
         for track_num, track in enumerate(disk_data):
+            """
+              track = [[id_field, Data-CRC_status, sect_data, DAM],...]
+                        id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
+                        num_read (int): number of sector read 
+                        num_error (int): number of sector read and caused error (CRC)
+            """
             num_sects = len(track)
             if num_sects==0:
                 continue
             self.set_sect_table(img, track_num, len(img))
             for sect in track:
-                idam = sect[0]
-                status = 0x00 if sect[1] else 0xb0
+                id_field = sect[0]
+                dt_crc   = sect[1]
+                id_crc   = id_field[6]
+                status      = 0
+                status     |= 0x00 if dt_crc else 0xb0   # Data CRC error
+                ext_status  = 0
+                ext_status |= 0x00 if id_crc else 0x01   # ID CRC error 
+                am = 0 if sect[3] else 0x10
                 sect_data = self.create_sector(
                     sect[2], 
-                    idam[0], idam[1], idam[2], idam[3], 
+                    id_field[0], id_field[1], id_field[2], id_field[3], 
                     num_sects, density=0, 
-                    am=0 if sect[3] else 0x10, 
+                    am=am,
                     status=status,
-                    pos = idam[6])  # Sector pos in MFM byte count
+                    ext_status=ext_status,
+                    id_crc1=id_field[4],      # ID CRC value
+                    id_crc2=id_field[5],
+                    pos = id_field[8])      # Sector pos in MFM byte count
                 img += bytearray(sect_data)
 
         # set total disk image size
