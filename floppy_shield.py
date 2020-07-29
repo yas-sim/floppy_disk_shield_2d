@@ -300,6 +300,8 @@ def read_track(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_leve
       mfm_buf : MFM decoded data (list)
       mc_buf  : MC or not flags (list). each data corresponds to the MFM data in the same position
     """
+    if log_level>0: print('**Read track')
+
     mfm_buf = []
     mc_buf  = []
 
@@ -356,8 +358,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
     id_mfm_pos = 0
     mfm_count  = 0
 
-    if log_level==2:
-        print('Search all ID')
+    if log_level>0: print('**Search all ID')
 
     while True:
         ## Format parsing
@@ -384,12 +385,11 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
                 continue
             # C2 C2 C2 FC is an Index mark but A1 A1 A1 FC can be used as ID mark (a bug in FDC?)
             elif data == 0xfe or (mc_byte == 0xa1 and data == 0xfc): # ID AM
-                if log_level>0:
-                    print('IDAM ', end='')
+                if log_level>0: print('IDAM ', end='')
                 id_field = [ data ]
                 read_count = 4+2   # ID+CRC
-                id_ds_pos  = ds.get_pos()                   # ID position in the interval buffer
-                id_mfm_pos = mfm_count 
+                id_ds_pos  = ds.get_pos()   # ID position in the interval buffer
+                id_mfm_pos = mfm_count-1
                 state = State.IDAM
             else:
                 state = State.IDLE
@@ -400,18 +400,14 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
-                id_ = id_field.copy()
-                id_field = id_field[1:]   # remove IDAM and CRC
                 if crc.get()==0:
-                    id_buf.append(id_field + [True, id_ds_pos, id_mfm_pos-1])
-                    if log_level>0:
-                        print("CRC - OK ({:02x},{:02x},{:02x},{:02x})".format(id_field[0], id_field[1], id_field[2], id_field[3]))
+                    id_buf.append(id_field[1:] + [True, id_ds_pos, id_mfm_pos])  #id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
+                    if log_level>0: print("CRC - OK ({:02x},{:02x},{:02x},{:02x}) - {}, {}".format(id_field[1], id_field[2], id_field[3], id_field[4], id_ds_pos, id_mfm_pos))
+                    if log_level>1: dump_list_hex(id_field)
                 else:
-                    id_buf.append(id_field + [False, id_ds_pos, id_mfm_pos-1])
-                    if log_level>0:
-                        print("CRC - ERROR")
-                    if log_level>1:
-                        dump_list_hex(id_)
+                    id_buf.append(id_field[1:] + [False, id_ds_pos, id_mfm_pos])
+                    if log_level>0: print("CRC - ERROR {}-{}".format(id_ds_pos, id_mfm_pos))
+                    if log_level>1: dump_list_hex(id_field)
                 state = State.IDLE
     return id_buf
 
@@ -449,16 +445,12 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
     ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     ds.set_mode(0)      # AM seeking
 
-    if ds_pos>(16*16):   # Rewind the start position a bit
-        ds_pos -= 16*16
-    else:
-        ds_pos = 0
+    ds_pos = max(0, ds_pos - (16*16))  # Rewind the start position a bit
     ds.set_pos(ds_pos)  # sector search start position
 
     crc = CCITT_CRC()
 
-    if log_level==2:
-        print('Read sector {:02x}'.format(sect_num))
+    if log_level>0: print('**Read sector {:02x}'.format(sect_num))
 
     while True:
         ## Format parsing
@@ -484,8 +476,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
                 continue
             # C2 C2 C2 FC is an Index mark but A1 A1 A1 FC can be used as ID mark (a bug in FDC?)
             elif data == 0xfe or (mc_byte == 0xa1 and data == 0xfc): # ID AM
-                if log_level>0:
-                    print('IDAM ', end='')
+                if log_level>0: print('IDAM ', end='')
                 id_field = [ data ]
                 read_count = 4+2   # ID+CRC
                 state = State.IDAM
@@ -509,8 +500,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
                 state = State.IDLE
 
         elif state == State.INDEX:          # Index Address mark
-            if log_level>0:
-                print('INDEX')
+            if log_level>0: print('INDEX')
             state = State.IDLE
  
         elif state == State.IDAM:           # ID Address Mark
@@ -522,13 +512,10 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
                 id_ = id_field.copy()
                 id_field = id_field[1:-2]   # remove IDAM and CRC
                 if crc.get()==0:
-                    if log_level>0:
-                        print("CRC - OK ({:02x},{:02x},{:02x},{:02x})".format(id_field[0], id_field[1], id_field[2], id_field[3]))
+                    if log_level>0: print("CRC - OK ({:02x},{:02x},{:02x},{:02x})".format(id_field[0], id_field[1], id_field[2], id_field[3]))
                 else:
-                    if log_level>0:
-                        print("CRC - ERROR")
-                    if log_level>1:
-                        dump_list_hex(id_)
+                    if log_level>0: print("CRC - ERROR")
+                    if log_level>1: dump_list_hex(id_)
                 state = State.IDLE
 
         # Read sector data for DAM and DDAM
@@ -538,22 +525,16 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
             if read_count == 0:
                 crc.reset()
                 crc.data(sector)
-                _sector = sector.copy()
-                sector  = sector[1:-2]   # remove DAM or DDAM and CRC
                 if crc.get()==0:
-                    if log_level>0:
-                        print("CRC - OK")
-                    if log_level>1:
-                        dump_list_hex(_sector)
-                    return (True, True, sector, address_mark)  # Status, Data-CRC, Data, DAM/DDAM
+                    if log_level>0: print("CRC - OK")
+                    if log_level>1: dump_list_hex(sector)
+                    return (True, True, sector[1:-2], address_mark)  # Status, Data-CRC, Data (except AM and CRCs), DAM/DDAM
                 else:
-                    if log_level>0:
-                        print("CRC - ERROR")
-                    if log_level>1:
-                        dump_list_hex(_sector)
-                    return (True, False, sector, address_mark)  # Status, Data-CRC, Data, DAM/DDAM
+                    if log_level>0: print("CRC - ERROR")
+                    if log_level>1: dump_list_hex(sector)
+                    return (True, False, sector[1:-2], address_mark)  # Status, Data-CRC, Data (except AM and CRCs), DAM/DDAM
 
-    return (False, False, [0], False)  # Status, CRC, Data, DAM/DDAM  (Sector not found)
+    return (False, False, [], False)  # Status, CRC, Data, DAM/DDAM  (Sector not found)
 
 
 
@@ -594,146 +575,6 @@ def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, lo
             num_read += 1
             track.append([id_field, True, sector, dam])  # ID, CRC, Data, DAM
     return track, num_read, num_error
-
-
-
-def decodeFormat(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
-    """
-    Decode bistream track data. Decodes Index AM, IDAM, DAM, and DDAM + read sector data on the fly.  
-    Args:
-      interval_buf : Bitstream buffer for a track (pulse interval buffer)
-      clk_spd : clock speed of the floppy capture shield (default = 4MHz = 4e6)
-      high_gain : data separator tracking gain for high speed (=address mark seeking) region
-      low_gain : data separator tracking gain for low speed (=data reading) region
-      log_level : 0=No message, 1=minimum message, 2=detailed message
-    """
-    class State(Enum):
-        IDLE       = 0
-        CHECK_MARK = 1
-        INDEX      = 2
-        IDAM       = 3
-        DAM        = 4
-        DDAM       = 5
-        DATA_READ  = 6
-
-    mfm_buf = []
-    mc_buf  = []
-
-    # Number of sectors successfully ( or error) read
-    num_sect_read = 0
-    num_sect_err  = 0
-
-    state = State.IDLE
-    read_count = 0
-    mc_byte = 0
-    id_field = []
-    sector = []
-    track = []
-
-    if log_level==2:
-        print('Decode format')
-
-    ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
-    ds.set_mode(0)      # AM seeking
-
-    crc = CCITT_CRC()
-
-    while True:
-        ## Format parsing
-
-        # set data separator mode
-        if state == State.IDLE or state == State.CHECK_MARK:
-            ds.set_mode(0)      # AM seeking
-        else:
-            ds.set_mode(1)      # data reading
-
-        data, mc = ds.get_byte()
-        if data == -1:
-            break
-        mfm_buf.append(data)
-        mc_buf.append(mc)
-
-        # State machine
-        if state == State.IDLE:
-            if  mc == True:                 # found a missing clock
-                state = State.CHECK_MARK
-
-        elif state == State.CHECK_MARK:
-            if mc == True:                  # Skip missing clock data
-                continue
-            # C2 C2 C2 FC is an Index mark but A1 A1 A1 FC can be used as ID mark (a bug in FDC?)
-            elif data == 0xfe or (mc_byte == 0xa1 and data == 0xfc): # ID AM
-                if log_level>0:
-                    print('IDAM ', end='')
-                id_field = [ data ]
-                read_count = 4+2   # ID+CRC
-                state = State.IDAM
-            elif mc_byte == 0xc2 and data == 0xfc:      # Index AM
-                state = State.INDEX
-            elif data == 0xfb or data == 0xf8:      # Data AM
-                if len(id_field)<4:
-                    state = State.IDLE
-                    continue
-                if log_level>0:
-                    if data==0xfb: print('DAM ', end='')
-                    else:          print('DDAM', end='')
-                sector = [ data ]
-                address_mark = True if data==0xfb else False     # DAM=True, DDAM=False
-                read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
-                read_count += 2   # for CRC
-                state = State.DATA_READ
-
-        elif state == State.INDEX:          # Index Address mark
-            if log_level>0:
-                print('INDEX')
-            state = State.IDLE
- 
-        elif state == State.IDAM:           # ID Address Mark
-            id_field.append(data)
-            read_count -= 1
-            if read_count == 0:
-                crc.reset()
-                crc.data(id_field)
-                if crc.get()==0:
-                    id_field = id_field[1:-2]   # remove IDAM and CRC
-                    if log_level>0:
-                        print("CRC - OK ({:02x},{:02x},{:02x},{:02x})".format(id_field[0], id_field[1], id_field[2], id_field[3]))
-                else:
-                    if log_level>0:
-                        print("CRC - ERROR")
-                    if log_level>1:
-                        dump_list_hex(id_field)
-                    id_field = []
-                state = State.IDLE
-
-        # Read sector data for DAM and DDAM
-        elif state == State.DATA_READ:
-            sector.append(data)
-            read_count -= 1
-            if read_count == 0:
-                crc.reset()
-                crc.data(sector)
-                _sector = sector.copy()
-                sector = sector[1:-2]   # remove DAM or DDAM and CRC
-                if crc.get()==0:
-                    num_sect_read += 1
-                    if log_level>0:
-                        print("CRC - OK")
-                    if log_level>1:
-                        dump_list_hex(_sector)
-                    track.append([id_field, True, sector, address_mark])  # ID, CRC, Data, AM
-                else:
-                    num_sect_err += 1
-                    if log_level>0:
-                        print("CRC - ERROR")
-                    if log_level>1:
-                        dump_list_hex(_sector)
-                    track.append([id_field, False, sector, address_mark])
-                id_field=[]
-                ds.reset(high_gain=high_gain, low_gain=low_gain)
-                state = State.IDLE
-
-    return track, mfm_buf, mc_buf, num_sect_read, num_sect_err
 
 
 # ----------------------------------------------------------------------------
@@ -819,7 +660,6 @@ class d77_image:
         img = self.create_header(disk_name, disk_type=disk_type)
         
         # Raw track data (D77 extension)
-        # Raw track data = [mfm0, mc0, mfm1, mc1, ...]
         if not mfm_data is None:
             if not mc_data is None:
                 print('Adding raw track image data (MFM+MC)')
@@ -861,22 +701,21 @@ class d77_image:
                 continue
             self.set_sect_table(img, track_num, len(img))
             for sect in track:
-                id_field = sect[0]
-                dt_crc   = sect[1]
-                id_crc   = id_field[6]
-                status      = 0
-                status     |= 0x00 if dt_crc else 0xb0   # Data CRC error
-                ext_status  = 0
-                ext_status |= 0x00 if id_crc else 0x01   # ID CRC error 
+                id_field   = sect[0]
+                dt_crc_f   = sect[1]
+                id_crc_f   = id_field[6]
+                status     = 0x00 if dt_crc_f else 0xb0   # Data CRC error
+                ext_status = 0x00 if id_crc_f else 0x01   # ID CRC error 
                 am = 0 if sect[3] else 0x10
                 sect_data = self.create_sector(
-                    sect[2], 
+                    sect[2],                # Sector data
                     id_field[0], id_field[1], id_field[2], id_field[3], 
-                    num_sects, density=0, 
+                    num_sects,
+                    density=0, 
                     am=am,
                     status=status,
-                    ext_status=ext_status,
-                    id_crc1=id_field[4],      # ID CRC value
+                    ext_status=ext_status,  # ID CRC error flag
+                    id_crc1=id_field[4],    # ID CRC value
                     id_crc2=id_field[5],
                     pos = id_field[8])      # Sector pos in MFM byte count
                 img += bytearray(sect_data)

@@ -128,7 +128,6 @@ def histogram(interval_buf):
 
 def mfm_dump(interval, args):
     mfm_buf, mc_buf = read_track(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
-    #track, mfm_buf, mc_buf, sec_read, sec_err = decodeFormat(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
     dumpMFM(mfm_buf, mc_buf)
 
@@ -141,12 +140,12 @@ def id_dump(interval, args):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', idam[6]))
     """
     track, sec_read, sec_err = read_all_sectors(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
-    print(' # : (C ,H ,R ,N ) ID-CRC MFM-POS')
+    print(' # : (C ,H ,R ,N ) ID-CRC AM    MFM-POS')
     for i, sect in enumerate(track):
         idam = sect[0]
-        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', 'DAM  ' if sect[3] else 'DDAM ', idam[6]))
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', 'DAM  ' if sect[3] else 'DDAM ', idam[8]))
         # track = [[id_field, CRC status, sect_data, DAM],...]
-        #                            id_field = [ C, H, R, N, CRC status, ds_pos, mfm_pos]
+        #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
 
 
 def generate_key(track):
