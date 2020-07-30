@@ -82,6 +82,8 @@ def timing_history(interval_buf, args):
     img = np.zeros((height, val_max * xstep, 3), dtype=np.uint8)
     while True:
         quant_interval, interval = ds.get_quantized_interval()
+        if quant_interval == -1:        # end of stream
+            break
         count+=1
         mfm, mc = mfm_decoder.decode(quant_interval, ds)
         if mfm != -1:
@@ -134,7 +136,6 @@ def mfm_dump(interval, args):
 #      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
 def id_dump(interval, args):
     """
-    print(' # : (C ,H ,R ,N ) STA MFM-POS')
     id_buf = search_all_idam(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     for i, idam in enumerate(id_buf):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', idam[6]))
@@ -153,6 +154,22 @@ def generate_key(track):
     sid = track %  2
     key = '{}-{}'.format(trk, sid)
     return key
+
+
+def read_sectors(interval_buf, args):
+    # track = [[id_field, Data-CRC status, sect_data, DAM],...]
+    #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
+    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
+    for i, sect in enumerate(track):
+        idam = sect[0]
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {:6} {} 0x{:04x}'.format(i+1, 
+            idam[0], idam[1], idam[2], idam[3], 
+            'OK ' if idam[6] else 'ERR',
+            'OK ' if sect[1] else 'ERR',
+            'DAM  ' if sect[3] else 'DDAM ',
+            idam[8]))
+    print('OK={}, Error={}'.format(sec_read, sec_err))
 
 
 def main(args):
@@ -180,6 +197,8 @@ def main(args):
             mfm_dump(interval_buf, args)
         if args.id_dump:
             id_dump(interval_buf, args)
+        if args.read_sectors:
+            read_sectors(interval_buf, args)
 
 
 if __name__ == '__main__':
@@ -194,6 +213,6 @@ if __name__ == '__main__':
     parser.add_argument('--history', action='store_true', default=False, help='display history graph of the pulse interval buffer')
     parser.add_argument('--mfm_dump', action='store_true', default=False, help='display MFM decoded data in HEX dump style')
     parser.add_argument('--id_dump', action='store_true', default=False, help='display decoded all ID address marks in the track')
-    parser.add_argument('--montecarlo', action='store_true', default=False, help='run Monte Carlo optimization to find the best parameter for high_gain and low_gain')
+    parser.add_argument('--read_sectors', action='store_true', default=False, help='read all sectors in the track and display result')
     args = parser.parse_args()
     main(args)

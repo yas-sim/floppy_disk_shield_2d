@@ -5,7 +5,9 @@ import argparse
 from d77lib import *
 
 def main(args):
-    d77 = decode_d77(args.input)
+    with open(args.input, 'rb') as f:
+        img = f.read()
+    d77 = decode_d77(img)
 
     # Display results
     print('Header:', d77['header'])
@@ -20,7 +22,8 @@ def main(args):
 
     disk = d77['disk']
     for trkid in range(start, end+1):
-        track = disk[trkid]
+        key = trkid
+        track = disk[key]
         print(trkid)
         print('#   C  H  R  N    S1 S2   AM   SIZE ICRC POS')
         for i, sect in enumerate(track):

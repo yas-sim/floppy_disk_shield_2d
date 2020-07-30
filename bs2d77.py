@@ -24,7 +24,7 @@ def main(args):
         track_data = bs.disk[track_id]     # pulse interval buffer
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
-        #                            id_field = [ C, H, R, N, ID-CRC status, ds_pos, mfm_pos]
+        #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
         track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
         disk.append(track)
         mfm_buf, mc_buf = read_track(track_data, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
