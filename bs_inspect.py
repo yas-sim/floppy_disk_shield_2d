@@ -7,7 +7,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from floppy_shield import *
+from floppylib import *
 
 def pause():
     while True:

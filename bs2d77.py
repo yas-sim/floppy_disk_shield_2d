@@ -1,7 +1,7 @@
 import os
 import argparse
 
-from floppy_shield import *
+from floppylib import *
 
 def main(args):
     if args.output is None:

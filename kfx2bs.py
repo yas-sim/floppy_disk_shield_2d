@@ -7,7 +7,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 
-from floppy_shield import *
+from floppylib import *
 
 
 def histogram(data):

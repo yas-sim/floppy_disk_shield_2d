@@ -9,7 +9,7 @@ import random
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from floppy_shield import *
+from floppylib import *
 
 def main(args):
     high_gain_range = eval(args.high_gain_range)
