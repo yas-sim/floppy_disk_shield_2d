@@ -21,18 +21,36 @@ def byteEncoder(object):
 def main(args):
     with open(args.input, 'rb') as f:
         img = f.read()
-    d77dic = decode_d77(img)
 
     if args.output is None:
         base, ext = os.path.splitext(args.input)
         out_name = base + '.json'
     else:
         out_name = args.input
+    base, ext = os.path.splitext(out_name)
 
-    with open(out_name, 'w') as f:
-        json.dump(d77dic, f, indent=2, default=byteEncoder)
+    # Divide multiple images from a file
+    img_array = []
+    while True:
+        size = get_dword(img, 0x1c)      # D77 image size
+        img_array.append(img[:size])
+        if len(img) <= size:
+            break
+        img = img[size:]
+    print(len(img_array), 'image data found')
+
+    for idx, img in enumerate(img_array):
+        d77dic = decode_d77(img)
+        del d77dic['sector_offsets']
+        if 'track_offsets' in d77dic.keys():
+            del d77dic['track_offsets']
+        out_name = '{}_{}{}'.format(base, idx, ext)
+        print('generating', out_name)
+        with open(out_name, 'w') as f:
+            json.dump(d77dic, f, indent=2, default=byteEncoder)
 
 if __name__ == "__main__":
+    print('** D77 image to JSON decoder')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input D77 image file path')
     parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output txt file path')

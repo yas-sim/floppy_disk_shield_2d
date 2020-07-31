@@ -67,7 +67,7 @@ class decode_MFM:
                 self.read_bit_count = 0
                 return data, False       # 8 bit data read completed
 
-def timing_history(interval_buf, args):
+def timing_history(interval_buf, spin_spd, args):
     val_max = 64
     ystep=1
     xstep = 4
@@ -75,7 +75,7 @@ def timing_history(interval_buf, args):
     height = 400
     writer = cv2.VideoWriter('history.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (val_max*xstep, height))
 
-    ds = data_separator(interval_buf, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain)
+    ds = data_separator(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain)
     mfm_decoder = decode_MFM()
 
     count=0
@@ -128,19 +128,19 @@ def histogram(interval_buf):
 
     plt.show()
 
-def mfm_dump(interval, args):
-    mfm_buf, mc_buf = read_track(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+def mfm_dump(interval, spin_spd, args):
+    mfm_buf, mc_buf = read_track(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
     dumpMFM(mfm_buf, mc_buf)
 
 #      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
-def id_dump(interval, args):
+def id_dump(interval, spin_spd, args):
     """
     id_buf = search_all_idam(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     for i, idam in enumerate(id_buf):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', idam[6]))
     """
-    track, sec_read, sec_err = read_all_sectors(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    track, sec_read, sec_err = read_all_sectors(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     print(' # : (C ,H ,R ,N ) ID-CRC AM    MFM-POS')
     for i, sect in enumerate(track):
         idam = sect[0]
@@ -156,10 +156,10 @@ def generate_key(track):
     return key
 
 
-def read_sectors(interval_buf, args):
+def read_sectors(interval_buf, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
     for i, sect in enumerate(track):
         idam = sect[0]
@@ -175,6 +175,7 @@ def read_sectors(interval_buf, args):
 def main(args):
     bs = bitstream()
     bs.open(args.input)
+    spin_speed = bs.spin_spd    # spin speed (ms)  300rpm == 200ms
 
     t = eval(args.track)
     if type(t) is tuple:
@@ -190,18 +191,19 @@ def main(args):
         interval_buf = bs.disk[key]
 
         if args.history:
-            timing_history(interval_buf, args)
+            timing_history(interval_buf, spin_speed, args)
         if args.histogram:
             histogram(interval_buf)
         if args.mfm_dump:
-            mfm_dump(interval_buf, args)
+            mfm_dump(interval_buf, spin_speed, args)
         if args.id_dump:
-            id_dump(interval_buf, args)
+            id_dump(interval_buf, spin_speed, args)
         if args.read_sectors:
-            read_sectors(interval_buf, args)
+            read_sectors(interval_buf, spin_speed, args)
 
 
 if __name__ == '__main__':
+    print('** Floppy data capture shield - bit stream data inspect tool')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input bitstream file path')
     parser.add_argument('-t', '--track', required=True, help='track number. single number or a tuple (start,end) (track # should be 0-83 for 2D, 0-163 for 2DD)')

@@ -11,7 +11,6 @@ from floppy_shield import *
 
 
 def histogram(data):
-  
     fig = plt.figure()
     ax1 = fig.add_subplot(1,2,1)
     ax2 = fig.add_subplot(1,2,2)
@@ -197,7 +196,6 @@ def decode_track(file):
                           index_data[-1][1]-index_data[-2][1],
                           index_data[-1][2]-index_data[-2][2]) 
                 """
-                """
                 if len(index_data)==2:
                     try:
                         spin_time = (index_data[-1][2]-index_data[-2][2]) * (1/ick)
@@ -205,8 +203,7 @@ def decode_track(file):
                     except ZeroDivisionError:
                         spin_time = 0
                         rpm = 0
-                    print('{} RPM'.format(rpm))
-                """
+                    print(', {:.2f} RPM'.format(rpm), end='')
                 prev_stream_position = stream_position
                 prev_sample_counter  = sample_counter
                 prev_index_counter   = index_counter
@@ -223,7 +220,7 @@ def decode_track(file):
                     if ('ick' in param):
                         ick = eval(param.split('=')[1])
                 if sck!=0 and ick!=0:
-                    print('SCK={}, ICK={}'.format(sck, ick))
+                    print(', SCK={:.2f}MHz, ICK={:.2f}MHz'.format(sck/1e6, ick/1e6), end='')
             if dt == 0x0d: # EOF
                 data = bs.get_variable_len(siz) 
                 break
@@ -235,6 +232,7 @@ def decode_track(file):
             dur = 0
             ovf = 0
 
+    print()
     return stream, stream_pos, index_data, sck
 
 
@@ -272,7 +270,9 @@ def main(args):
 
     fdshield_clk = args.clk_spd   # Clock speed of FD-Shield (default: 4MHz)
 
-    with open(base_dir+'.log', 'w') as f:
+    out_file = base_dir + '.log'
+    print(os.path.join(args.input, '*.raw'), '->', out_file)
+    with open(out_file, 'w') as f:
         count = 0
         # Process all raw files in the directory
         for file in files:
@@ -287,11 +287,9 @@ def main(args):
             f.write('**TRACK_END\n')
             count += 1
 
-    #histogram(stream)
-
 
 if __name__ == '__main__':
-    print('*** FryoFlux RAW stream data to FD-Shield bitstream file converter')
+    print('** FryoFlux RAW stream data to FD-Shield bitstream file converter (https://www.kryoflux.com/)')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='Directory name which contains input KryoFlux RAW bitstream files')
     parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='clock speed for down-sampling (default=4MHz=4000000)')

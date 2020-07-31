@@ -1,12 +1,14 @@
+// 2D/2DD Floppy disk capture shield control software
+
 #include <SPI.h>
 
 #include <avr/pgmspace.h>
 
 #define SPISRAM_HOLD  (A4)
-#define FD_TRK00      (A3)  /* A3 */
-#define FD_READY      (A2)  /* A2 */
-#define CAP_ACTIVE    (A1)  /* A1 */
-#define FD_INDEX      (A0)  /* A0 */
+#define FD_TRK00      (A3)
+#define FD_READY      (A2)
+#define CAP_ACTIVE    (A1)
+#define FD_INDEX      (A0)
 #define SPI_SCK       (13)
 #define SPI_MISO      (12)
 #define SPI_MOSI      (11)
@@ -19,6 +21,11 @@
 #define CAP_RST       (4)
 #define CAP_EN        (3)
 #define FD_WP         (2)
+
+#define STEP_RATE     (10)  /* ms */
+
+size_t g_spin_ms;     // FDD spin speed (ms)
+
 
 // This class changes the configuration of Timer 1 for disc rotate speed measurement purpose
 class FDD {
@@ -45,7 +52,7 @@ class FDD {
       pinMode(FD_WP,        INPUT_PULLUP);
 
       digitalWrite(FD_DIR,        HIGH);  // - direction
-      digitalWrite(FD_STEP,       LOW);
+      digitalWrite(FD_STEP,       HIGH);
 
       set_drive_mode(0); // 2D
 
@@ -65,10 +72,10 @@ class FDD {
     void step(void) {
       int iter = drive_mode == ENUM_DRV_MODE::mode_2dd ? 2 : 1;
       for (int i = 0; i < iter; i++) {
-        digitalWrite(FD_STEP, HIGH);
-        delay(10);
         digitalWrite(FD_STEP, LOW);
-        delay(10);
+        delay(STEP_RATE/2);
+        digitalWrite(FD_STEP, HIGH);
+        delay(STEP_RATE/2);
       }
     }
 
@@ -143,11 +150,25 @@ class FDD {
       }
     }
 
+    void detect_drive_mode(void) {
+      set_drive_mode(FDD::ENUM_DRV_MODE::mode_2d);
+      track00();
+      seek(0,44);
+      seek(42,0);
+      if(readTRK00()==LOW) {
+        set_drive_mode(FDD::ENUM_DRV_MODE::mode_2d);
+        Serial.print(F("A 2D"));
+      } else {
+        set_drive_mode(FDD::ENUM_DRV_MODE::mode_2dd);
+        Serial.print(F("A 2DD"));
+      }
+      Serial.println(F(" drive is detected"));
+    }
 
     // TCNT1 = 250KHz count
     // INDEX pulse = 4.33ms negative pulse
 
-    long measure_rpm() {
+    float measure_rpm() {
       uint8_t TCCR1A_bkup = TCCR1A;
       TCCR1A = TCCR1A & 0xfc;   // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
 
@@ -157,10 +178,10 @@ class FDD {
       waitIndex();
       tcnt1 = TCNT1;
       tcnt1 = tcnt1 > tcnt1_ ? tcnt1 - tcnt1_ : tcnt1 - tcnt1_ + 65535;
-      Serial.println(((tcnt1 * 1000) / 250e3), DEC); // ms
+      float spin = tcnt1 / 250e3;
 
       TCCR1A = TCCR1A_bkup;
-      return tcnt1;
+      return spin;
     }
 } FDD;
 
@@ -316,6 +337,7 @@ void print8BIN(byte dt) {
   }
 }
 
+
 void printHex(byte dt) {
   if (dt < 0x10) {
     Serial.print(F("0"));
@@ -323,8 +345,10 @@ void printHex(byte dt) {
   Serial.print(dt, HEX);
 }
 
+
 //const unsigned long TRACK_CAPACITY =  25000UL; // 200ms*1MHz /8bit
-const unsigned long TRACK_CAPACITY   = 100000UL; // 200ms*4MHz /8bit
+//const unsigned long TRACK_CAPACITY   = 100000UL; // 200ms*4MHz /8bit
+const unsigned long TRACK_CAPACITY   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
 
 void dumpTrack_bit(unsigned long bytes = 0UL) {
   SPISRAM.beginRead();
@@ -338,6 +362,7 @@ void dumpTrack_bit(unsigned long bytes = 0UL) {
   Serial.println(F(" "));
   SPISRAM.endAccess();
 }
+
 
 void dumpTrack_hex(unsigned long bytes = 0UL) {
 
@@ -355,6 +380,7 @@ void dumpTrack_hex(unsigned long bytes = 0UL) {
   SPISRAM.endAccess();
   Serial.println(F("TRACK_DUMP_END   ========================================="));
 }
+
 
 void dumpTrack_encode(unsigned long bytes = 0UL) {
 
@@ -398,6 +424,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   Serial.println(F(""));
 }
 
+
 void histogram(unsigned long bytes = 0UL) {
   unsigned int histo[10];
   for (int i = 0; i < 10; i++) histo[i] = 0UL;
@@ -430,12 +457,14 @@ void histogram(unsigned long bytes = 0UL) {
     Serial.println(histo[i]);
   }
 }
+
+
 // Calibrate motor speed
 void revolution_calibration(void) {
+  float spin;
   while (1) {
-    FDD.measure_rpm();
-    //trackRead();
-    //histogram();
+    spin = FDD.measure_rpm();
+    Serial.println(spin * 1000, DEC); // ms
   }
 }
 
@@ -451,10 +480,10 @@ void trackRead(void) {
   // Start captuering
   SPISRAM.hold(HIGH);
   FDCap.enable();
-  delay(200 / 10);                // wait for 20ms (1 rotation == 200ms)
+  delay(g_spin_ms / 10);          // wait for 10% of spin
 
   FDD.waitIndex();
-  delay(5);                       // Capture the top of the 2nd rotation (for 5ms)
+  delay(g_spin_ms / 100);         // 1% over capturing
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
@@ -477,12 +506,14 @@ void read_tracks(int start_track, int end_track) {
 
     FDD.side(fdd_side);
     SPISRAM.clear();
-    trackRead();
 
     Serial.print(F("**TRACK_READ "));
     Serial.print(fdd_track);
     Serial.print(F(" "));
     Serial.println(fdd_side);
+
+    trackRead();
+
     dumpTrack_encode(TRACK_CAPACITY);
     Serial.println(F("**TRACK_END"));
   }
@@ -492,8 +523,8 @@ void read_tracks(int start_track, int end_track) {
 
   FDD.motor(false);
   FDD.head(false);
-  while (true) ;
 }
+
 
 // Memory test
 void memory_test(void) {
@@ -503,6 +534,7 @@ void memory_test(void) {
   SPISRAM.dump(40);
   //dumpTrack_bit();
 }
+
 
 void timing_light(int freq) {
   int period = 1000 / freq;
@@ -515,6 +547,7 @@ void timing_light(int freq) {
 }
 
 
+
 void setup() {
   // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
   FDCap.init();
@@ -523,26 +556,40 @@ void setup() {
   Serial.begin(115200);
 
   FDD.init();                                     // Motor on, Head load on
-  FDD.set_drive_mode(FDD::ENUM_DRV_MODE::mode_2dd);// Floppy drive mode set (not a mode for media)
+  delay(200);
 
-  delay(500);
-  for (int i = 0; i < 20; i++) {
-    FDD.stepIn();
-  }
+  FDD.detect_drive_mode();                        // Detect FDD type (2D/2DD)
   FDD.track00();
+
   // Step in for a half track (1/2 2D step == 1 2DD step) 
   //if(FDD.get_drive_mode == FDD:ENUM_DRV_MODE::mode_2dd) {
   //  FDD.stepIn();
   //}
 
   SPISRAM.clear();
+
+  delay(3 * 1000);
+  
 }
+
 
 void loop() {
   //timing_light(50);
   //revolution_calibration();
 
+  // Measure FDD spindle speed
+  float spin = 0.f;
+  for(int i=0; i<5; i++) {
+    spin += FDD.measure_rpm();
+  }
+  spin /= 5;
+  Serial.print(F("**SPIN_SPD "));
+  Serial.println(spin,8);
+  g_spin_ms = (int)(spin*1000);
+
+  // Read all tracks
   read_tracks(0, 79);
-  //
-  //read_tracks(3, 3);
+
+  // Stop
+  while (true) delay(100);
 }

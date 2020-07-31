@@ -20,13 +20,13 @@ def main(args):
         start = t
         end   = t
 
-    disk = d77['disk']
+    all_sectors = d77['sectors']
     for trkid in range(start, end+1):
         key = trkid
-        track = disk[key]
+        sectors = all_sectors[key]
         print(trkid)
         print('#   C  H  R  N    S1 S2   AM   SIZE ICRC POS')
-        for i, sect in enumerate(track):
+        for i, sect in enumerate(sectors):
             c,h,r,n = sect['CHRN'].split(':')
             status = sect['status']
             size = sect['size']
@@ -41,6 +41,7 @@ def main(args):
             #print('num_sec', sect['num_sec'])
 
 if __name__ == '__main__':
+    print('** D77 disk image inspection tool')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input bitstream file path')
     parser.add_argument('-t', '--track', required=True, help='track number. single number or a tuple (start,end) (track # should be 0-83 for 2D, 0-163 for 2DD)')

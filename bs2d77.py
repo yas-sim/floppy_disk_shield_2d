@@ -13,6 +13,8 @@ def main(args):
     # read a bitstream file
     bs = bitstream()
     bs.open(args.input)
+    spin_speed = bs.spin_spd
+    print('Spin speed:', spin_speed*1000, 'ms')
 
     disk = []  # contains all track data
     mfm = []   # decoded mfm data buffer
@@ -25,9 +27,9 @@ def main(args):
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
         #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-        track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+        track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
         disk.append(track)
-        mfm_buf, mc_buf = read_track(track_data, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+        mfm_buf, mc_buf = read_track(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
         mfm.append(mfm_buf)
         mc.append(mc_buf)
 

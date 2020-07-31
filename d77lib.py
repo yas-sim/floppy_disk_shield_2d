@@ -88,7 +88,12 @@ def get_raw_track_data(img, trk):
     return bytearray([])
 
 
-
+# D77 image to Python dict
+# 'header' : header information
+# 'sector_offsets' : sector offset data
+# 'sectors' : sector data
+# 'track_offsets' : track offset data
+# 'tracks' : raw tarck image data
 def decode_d77(img):
     d77 = {}
 
@@ -99,36 +104,38 @@ def decode_d77(img):
     trk_ofst = [0]*164
     for t in range(164):
         trk_ofst[t] = get_dword(img, 0x0020 + t*4)
-    d77['trk_ofst'] = trk_ofst
+    d77['sector_offsets'] = trk_ofst
 
     if is_raw_track_supported(img):       # Raw track image data is supported
         # Extract raw track image data offset
         raw_trk_ofst = [0]*164
         for t in range(164):
             raw_trk_ofst[t] = get_raw_track_offset(img, t)
-        d77['raw_trk_ofst'] = raw_trk_ofst
+        d77['track_offsets'] = raw_trk_ofst
     
         # Extract raw track image data
-        d77['raw_trk_data'] = {}
+        d77['tracks'] = {}
         for t in range(164):
-            d77['raw_trk_data'][t] = get_raw_track_data(img, t)
+            d77['tracks'][t] = get_raw_track_data(img, t)
 
     # Extract sector data
     disk = {}
     for t in range(164):
         key = t
-        disk[key] = []
         ofst = get_track_offset(img, t)
         if ofst == 0:
             continue
+        disk[key] = []
         sect = get_sect(img, ofst)
         num_sect = sect['num_sec']
         for i in range(num_sect):
             sect = get_sect(img, ofst)
             disk[key].append(sect)
             ofst += 0x10 + sect['size']
-    d77['disk'] = disk
+    d77['sectors'] = disk
     return d77
+
+
 
 def encode_d77(d77dic):
     d77hdr = d77dic['header']
@@ -146,7 +153,7 @@ def encode_d77(d77dic):
     # raw track image data
     if raw_track == 0x10:
         d77img += bytearray([0,0,0,0]*164)   # raw track image data table
-        tracks = d77dic['raw_trk_data']
+        tracks = d77dic['tracks']
         for trk_key, track_img in tracks.items():
             if track_img is None: continue
             trk_data = bytearray([0,0,0,0]) + track_img               # 1st 4 bytes are for track image size (DWORD)
@@ -155,8 +162,8 @@ def encode_d77(d77dic):
             d77img += trk_data
 
     # sector data
-    tracks = d77dic['disk']
-    for trk_key, sects in tracks.items():
+    sectors = d77dic['sectors']
+    for trk_key, sects in sectors.items():
         if len(sects)==0: continue
         set_dword(d77img, 0x20 + int(trk_key)*4, len(d77img))    # set track data (sector data) offset table
         for sect in sects:

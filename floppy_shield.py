@@ -25,12 +25,15 @@ class bitstream:
 
     def open(self, file):
         self.disk = {}
+        self.spin_spd = 0.2             # default spin speed = 0.2ms = 300rpm
         with open(file, 'r') as f:
             linebuf = ''
             for line in f:
                 line = line.rstrip('\n')
                 if len(line)==0:
                     continue
+                if '**SPIN_SPD'   in line:
+                    self.spin_spd = float(line.split(' ')[1])
                 if '**TRACK_READ' in line:
                     trk, side = [ int(v) for v in line.split(' ')[1:] ]
                     linebuf = ''
@@ -148,10 +151,10 @@ A1: ' D   D  C * C  D'
 """
 
 class data_separator:
-    def __init__(self, interval_buf, clk_spd =4e6, high_gain=0.3, low_gain=0.01):
+    def __init__(self, interval_buf, clk_spd =4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
         self.interval_buf = interval_buf
         self.pos = 0
-        self.reset(clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)
+        self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
         missing_clock_c2 = (0x5224)  #  [0,1,0,1, 0,0,1,0, 0,0,1,0, 0,1,0,0]
         missing_clock_a1 = (0x4489)  #  [0,1,0,0, 0,1,0,0, 1,0,0,0, 1,0,0,1]
         pattern_ff       = (0x5555555555555555)  # for 4 bytes of sync data (unused)
@@ -178,10 +181,11 @@ class data_separator:
         """
         self.mode = mode
 
-    def reset(self, clk_spd=4e6, high_gain=0.3, low_gain=0.01):
+    def reset(self, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
         self.clock_speed   = clk_spd
-        self.bit_cell      = 500e3    # 1/2MHz
-        self.cell_size     = self.clock_speed / self.bit_cell
+        self.spin_speed    = spin_spd                 # ms/spin
+        self.bit_cell      = 500e3                    # 1/2MHz
+        self.cell_size     = (self.clock_speed*(spin_spd/0.2)) / self.bit_cell
         self.cell_size_ref = self.cell_size
         self.cell_size_max = self.cell_size * 1.1
         self.cell_size_min = self.cell_size * 0.9
@@ -287,7 +291,7 @@ class data_separator:
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
-def read_track(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
+def read_track(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
     """
     Decode bistream track data  
     Args:
@@ -305,7 +309,7 @@ def read_track(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_leve
     mfm_buf = []
     mc_buf  = []
 
-    ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
+    ds = data_separator(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     ds.set_mode(0)      # AM seeking
 
     while True:
@@ -318,7 +322,7 @@ def read_track(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_leve
 
 
 
-def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
+def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
     """
     Decode bistream track data  
     Args:
@@ -342,7 +346,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
         DDAM       = 5
         DATA_READ  = 6
     
-    ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
+    ds = data_separator(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     ds.set_mode(0)      # AM seeking
     ds.set_pos(0)
 
@@ -413,7 +417,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log
 
 
 
-def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
+def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
     """
     Decode bistream track data  
     Args:  
@@ -442,7 +446,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
     id_field = []
     sector = []
 
-    ds = data_separator(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
+    ds = data_separator(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)    # Clock / Data separator
     ds.set_mode(0)      # AM seeking
 
     ds_pos = max(0, ds_pos - (16*16))  # Rewind the start position a bit
@@ -538,7 +542,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, high_gain=0.3, lo
 
 
 
-def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, log_level=0):
+def read_all_sectors(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
     """
     Read all sector data in a track  
     Return:  
@@ -554,7 +558,7 @@ def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, lo
     if log_level==2:
         print('Read all sectors')
 
-    id_list = search_all_idam(interval_buf, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
+    id_list = search_all_idam(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
     for id_field in id_list:
         sect    = id_field[2]
         idcrc   = id_field[6]
@@ -563,7 +567,7 @@ def read_all_sectors(interval_buf, clk_spd=4e6, high_gain=0.3, low_gain=0.01, lo
             num_error += 1
             track.append([id_field, False, [], True]) # ID, CRC=Err, Data, DAM=DAM
             continue
-        status, datacrc, sector, dam = read_sector(interval_buf, sect_num = sect, ds_pos = pos, clk_spd=clk_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
+        status, datacrc, sector, dam = read_sector(interval_buf, sect_num = sect, ds_pos = pos, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
         if status == False:   # record not found
             num_error += 1
             track.append([id_field, False, [], True])  # ID, CRC, Data, DAM

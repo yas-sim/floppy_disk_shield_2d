@@ -29,10 +29,12 @@ def main(args):
 
     d77img = encode_d77(d77dic)
 
+    print('generating', out_name)
     with open(out_name, 'wb') as f:
         f.write(d77img)
 
 if __name__ == "__main__":
+    print('** JSON image to D77 encoder')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input D77 image decoded JSON file path')
     parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output D77 image file path')
