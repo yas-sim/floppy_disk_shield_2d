@@ -17,29 +17,38 @@ def main(args):
     print('Spin speed:', spin_speed*1000, 'ms')
 
     disk = []  # contains all track data
-    mfm = []   # decoded mfm data buffer
-    mc = []    # missing clock buffer
+    mfm  = []  # decoded mfm data buffer
+    mc   = []  # missing clock buffer
+
+    ttl_read = 0   # Total count of successfully read sectors
+    ttl_err  = 0   # Total count of error sectors
+    ttl_trk  = 0   # Total count of tracks
 
     count = 0
     # Find all IDs and read sectors for all tracks
     for track_id in bs.disk:
+        ttl_trk += 1
         track_data = bs.disk[track_id]     # pulse interval buffer
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
         #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
         track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+        ttl_read += sec_read
+        ttl_err  += sec_err
         disk.append(track)
         mfm_buf, mc_buf = read_track(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
         mfm.append(mfm_buf)
         mc.append(mc_buf)
 
         trk, sid = track_id.split('-')
-        print('{:03}-{:02} {:02}/{:02}   '.format(int(trk), int(sid), sec_read, sec_err), end='', flush=True)
-        if count == 4 or args.log_level>0:
+        print('{:03} {:02}/{:02}   '.format(int(trk)*2+int(sid), sec_read, sec_err), end='', flush=True)
+        if count == 5 or args.log_level>0:
             count = 0
-            print('')
+            print()
         else:
             count += 1
+    if count!=0:
+        print()
 
     # Identify disk type (2D / 2DD) 
     num_track = len(disk)
@@ -54,13 +63,17 @@ def main(args):
     with open(out_name, 'wb') as f:
         f.write(img)
 
+    print('{:5} sectors read (no error)'.format(ttl_read))
+    print('{:5} error sectors'.format(ttl_err))
+    print('{} sectors in a track (average)'.format((ttl_read + ttl_err) / ttl_trk))
 
 if __name__ == "__main__":
+    print('** Floppy shield bit-stream data to D77 image converter')
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input image file path')
     parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output D77 image path')
-    parser.add_argument('--high_gain', type=float, required=False, default=0.3, help='high-speed data separator gain (default: 0.3)')
-    parser.add_argument('--low_gain', type=float, required=False, default=0.125, help='low-speed data separator gain (default: 0.125)')
+    parser.add_argument('--high_gain', type=float, required=False, default=0, help='high-speed data separator gain (default: 0, recommend: 0~0.4)')
+    parser.add_argument('--low_gain', type=float, required=False, default=0, help='low-speed data separator gain (default: 0, recommend: 0~high_gain)')
     parser.add_argument('--log_level', type=int, required=False, default=0, help='log level: 0=off, 1=minimum, 2=verbose')
     parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4000000)')
     args = parser.parse_args()

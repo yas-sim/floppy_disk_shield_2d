@@ -1,7 +1,6 @@
 // 2D/2DD Floppy disk capture shield control software
 
 #include <SPI.h>
-
 #include <avr/pgmspace.h>
 
 #define SPISRAM_HOLD  (A4)
@@ -157,10 +156,10 @@ class FDD {
       seek(42,0);
       if(readTRK00()==LOW) {
         set_drive_mode(FDD::ENUM_DRV_MODE::mode_2d);
-        Serial.print(F("A 2D"));
+        Serial.print(F("**2D"));
       } else {
         set_drive_mode(FDD::ENUM_DRV_MODE::mode_2dd);
-        Serial.print(F("A 2DD"));
+        Serial.print(F("**2DD"));
       }
       Serial.println(F(" drive is detected"));
     }
@@ -366,7 +365,7 @@ void dumpTrack_bit(unsigned long bytes = 0UL) {
 
 void dumpTrack_hex(unsigned long bytes = 0UL) {
 
-  Serial.println(F("TRACK_DUMP_START ========================================="));
+  Serial.println(F("**TRACK_DUMP_START"));
   SPISRAM.beginRead();
 
   if (bytes == 0) bytes = TRACK_CAPACITY;
@@ -378,7 +377,7 @@ void dumpTrack_hex(unsigned long bytes = 0UL) {
     }
   }
   SPISRAM.endAccess();
-  Serial.println(F("TRACK_DUMP_END   ========================================="));
+  Serial.println(F("**TRACK_DUMP_END"));
 }
 
 
@@ -391,8 +390,8 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   int prev = 0;
   int count = 1;
   int b;
-  char str[2] = {' ', '\0'};
   int chr_count = 0;
+  byte out;
   for (unsigned long i = 0; i < bytes; i++) {
     int dt = SPISRAM.transfer(0);
     for (int p = 0; p < 8; p++) {
@@ -402,16 +401,16 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
         count++;
       } else {
         if (count <= 'z' - ' ') {
-          str[0] = count + ' ';
+          out = count + ' ';
           if (chr_count % 100 == 0) {
-            Serial.print("~");    // Start line code
+            Serial.write('~');    // Start line code
           }
-          Serial.print(str);
+          Serial.write(out);
           count = 1;
           chr_count++;
           if (chr_count % 100 == 99) {
             chr_count = 0;
-            Serial.println(F(""));
+            Serial.println("");
           }
         } else {
           // Suppress output for extraordinay long pulse period data (=sort of noise)
@@ -483,7 +482,7 @@ void trackRead(void) {
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
   FDD.waitIndex();
-  delay(g_spin_ms / 100);         // 1% over capturing
+  //delay(g_spin_ms / 50);          // 2% over capturing (read overlap)
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
@@ -519,10 +518,6 @@ void read_tracks(int start_track, int end_track) {
   }
   //dumpTrack_hex(TRACK_CAPACITY);
   //dumpTrack_bit(10);
-  Serial.println(F("Completed."));
-
-  FDD.motor(false);
-  FDD.head(false);
 }
 
 
@@ -536,6 +531,8 @@ void memory_test(void) {
 }
 
 
+// Use access indicator LED as a timing light
+// for FDD revolution adjustment
 void timing_light(int freq) {
   int period = 1000 / freq;
   while (1) {
@@ -558,18 +555,7 @@ void setup() {
   FDD.init();                                     // Motor on, Head load on
   delay(200);
 
-  FDD.detect_drive_mode();                        // Detect FDD type (2D/2DD)
-  FDD.track00();
-
-  // Step in for a half track (1/2 2D step == 1 2DD step) 
-  //if(FDD.get_drive_mode == FDD:ENUM_DRV_MODE::mode_2dd) {
-  //  FDD.stepIn();
-  //}
-
   SPISRAM.clear();
-
-  delay(3 * 1000);
-  
 }
 
 
@@ -577,6 +563,14 @@ void loop() {
   //timing_light(50);
   //revolution_calibration();
 
+  // Detect FDD type (2D/2DD)
+  FDD.detect_drive_mode();
+  FDD.track00();
+
+  delay(3 * 1000);
+
+  Serial.println(F("**START"));
+  
   // Measure FDD spindle speed
   float spin = 0.f;
   for(int i=0; i<5; i++) {
@@ -588,7 +582,15 @@ void loop() {
   g_spin_ms = (int)(spin*1000);
 
   // Read all tracks
+  //  2D: 0 to 79 (83 for over tracks)
+  // 2DD: 0 to 159 (163 for over tracks)
   read_tracks(0, 79);
+  //read_tracks(0, 159);
+
+  Serial.println(F("**COMPLETED"));
+
+  FDD.head(false);
+  FDD.motor(false);
 
   // Stop
   while (true) delay(100);

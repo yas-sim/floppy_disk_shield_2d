@@ -1,4 +1,4 @@
-# bitstream analyzer
+# bitstream inspector
 
 import sys
 import argparse
@@ -135,26 +135,16 @@ def mfm_dump(interval, spin_spd, args):
 
 #      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
 def id_dump(interval, spin_spd, args):
-    """
-    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    print(' # : (C ,H ,R ,N ) ID-CRC CRC-val')
     for i, idam in enumerate(id_buf):
-        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[4] else 'ERR', idam[6]))
-    """
-    track, sec_read, sec_err = read_all_sectors(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
-    print(' # : (C ,H ,R ,N ) ID-CRC AM    MFM-POS')
-    for i, sect in enumerate(track):
-        idam = sect[0]
-        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {} 0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', 'DAM  ' if sect[3] else 'DDAM ', idam[8]))
-        # track = [[id_field, CRC status, sect_data, DAM],...]
-        #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {}    0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', idam[8]))
 
 def generate_key(track):
     trk = track // 2
     sid = track %  2
     key = '{}-{}'.format(trk, sid)
     return key
-
 
 def read_sectors(interval_buf, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
@@ -165,8 +155,8 @@ def read_sectors(interval_buf, spin_spd, args):
         idam = sect[0]
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {:6} {} 0x{:04x}'.format(i+1, 
             idam[0], idam[1], idam[2], idam[3], 
-            'OK ' if idam[6] else 'ERR',
-            'OK ' if sect[1] else 'ERR',
+            'OK '   if idam[6] else 'ERR',
+            'OK '   if sect[1] else 'ERR',
             'DAM  ' if sect[3] else 'DDAM ',
             idam[8]))
     print('OK={}, Error={}'.format(sec_read, sec_err))
@@ -207,8 +197,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input bitstream file path')
     parser.add_argument('-t', '--track', required=True, help='track number. single number or a tuple (start,end) (track # should be 0-83 for 2D, 0-163 for 2DD)')
-    parser.add_argument('--high_gain', type=float, required=False, default=0.3, help='high-speed data separator gain (default: 0.3)')
-    parser.add_argument('--low_gain', type=float, required=False, default=0.125, help='low-speed data separator gain (default: 0.125)')
+    parser.add_argument('--high_gain', type=float, required=False, default=0, help='data separator gain for high-speed tracking mode (default: 0, recommend: 0~0.4)')
+    parser.add_argument('--low_gain', type=float, required=False, default=0, help='data separator gain for low-speed tracking mode (default: 0, recommend: 0~high_gain)')
     parser.add_argument('--log_level', type=int, required=False, default=0, choices=(0,1,2) ,help='log level: 0=off, 1=minimum, 2=verbose')
     parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4000000)')
     parser.add_argument('--histogram', action='store_true', default=False, help='display histogram of the pulse interval buffer')
