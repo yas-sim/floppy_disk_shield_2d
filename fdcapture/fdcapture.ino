@@ -168,6 +168,7 @@ class FDD {
     // INDEX pulse = 4.33ms negative pulse
 
     float measure_rpm() {
+#if defined(__AVR_ATmega328P__)
       uint8_t TCCR1A_bkup = TCCR1A;
       TCCR1A = TCCR1A & 0xfc;   // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
 
@@ -180,8 +181,12 @@ class FDD {
       float spin = tcnt1 / 250e3;
 
       TCCR1A = TCCR1A_bkup;
-      return spin;
+#else
+      float spin = 0.2f;      // Arduino boards other than 'Uno' use fixed spin value
+#endif
+      return spin;            // sec/spin  default=0.2sec/spin(=300rpm)
     }
+  
 } FDD;
 
 
@@ -482,7 +487,8 @@ void trackRead(void) {
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
   FDD.waitIndex();
-  //delay(g_spin_ms / 50);          // 2% over capturing (read overlap)
+  delay((g_spin_ms*2) / 100);          // 2% over capturing (read overlap)
+  //delay((g_spin_ms*5) / 100);          // 5% over capturing (read overlap)
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
