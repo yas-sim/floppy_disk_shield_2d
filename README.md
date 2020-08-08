@@ -8,8 +8,10 @@
 
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
+The system includes a bit-stream data to D77/D88 emulator disk image converter. You can generate the disk images from the phicical floppy disks.  
 
 The system consists with hardware and software:  
+
 **Hardware**  
 |Item|Description|
 |:----|:----|
@@ -45,4 +47,16 @@ The system consists with hardware and software:
 ![MFM Missing Clock Patterns](resources/missing_clock.jpg)
 
 ![system_diagram](resources/byte_sync.jpg)
+
+## Test Environment
+
+- Windows 10 1909
+- Arduino UNO
+
+|FDD|Mfg|FF|Description|
+|---|----|----|----|
+|FD55-GFR|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
+|FD-235HG|TEAC|3.5"|2DD/2HD, 300/(360)rpm, dual-mode?|
+|YD-580|YE-Data|5.25"|2D, 300rpm, for FM-7 (1984-11)|
+|YD625-1525|YE-Data|3.5"|2D, 300rpm, for FM-77|
 
