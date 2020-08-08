@@ -32,7 +32,8 @@ def main(args):
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
         #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-        track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+        track, sec_read, sec_err = read_all_sectors(track_data, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
+                    abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
         ttl_read += sec_read
         ttl_err  += sec_err
         disk.append(track)
@@ -67,6 +68,8 @@ def main(args):
     print('{:5} error sectors'.format(ttl_err))
     print('{} sectors in a track (average)'.format((ttl_read + ttl_err) / ttl_trk))
 
+
+
 if __name__ == "__main__":
     print('** Floppy shield bit-stream data to D77 image converter')
     parser = argparse.ArgumentParser()
@@ -76,6 +79,8 @@ if __name__ == "__main__":
     parser.add_argument('--low_gain', type=float, required=False, default=0, help='low-speed data separator gain (default: 0, recommend: 0~high_gain)')
     parser.add_argument('--log_level', type=int, required=False, default=0, help='log level: 0=off, 1=minimum, 2=verbose')
     parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4000000)')
+    parser.add_argument('--abort_index', action='store_true', default=False, help='abort ID reading on 2nd index mark detection (Default=False)')
+    parser.add_argument('--abort_id', action='store_true', default=True, help='abort ID reading on 2nd identical ID detection (Default=True)')    
     args = parser.parse_args()
 
     main(args)

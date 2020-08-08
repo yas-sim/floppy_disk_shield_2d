@@ -487,7 +487,8 @@ void trackRead(void) {
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
   FDD.waitIndex();
-  delay((g_spin_ms*2) / 100);          // 2% over capturing (read overlap)
+  delay(40);
+  //delay((g_spin_ms*2) / 100);          // 2% over capturing (read overlap)
   //delay((g_spin_ms*5) / 100);          // 5% over capturing (read overlap)
 
   // Stop capturing
@@ -566,6 +567,8 @@ void setup() {
 
 
 void loop() {
+  Serial.println("");
+  Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
   //timing_light(50);
   //revolution_calibration();
 

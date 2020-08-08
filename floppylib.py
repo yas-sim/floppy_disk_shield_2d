@@ -322,7 +322,7 @@ def read_track(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=
 
 
 
-def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
+def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0, abort_by_idxmark=True, abort_by_sameid=True):
     """
     Decode bistream track data  
     Args:
@@ -331,6 +331,8 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
       high_gain : data separator tracking gain for high speed (=address mark seeking) region
       low_gain : data separator tracking gain for low speed (=data reading) region
       log_level : 0=No message, 1=minimum message, 2=detailed message
+      abort_by_idxmark (bool): Abort reading on detection of 2nd index mark 
+      abort_by_sameid  (bool): Abort reading on detection of 2nd same ID detection (potential of 2nd lap)
     Returns:
       id_buf = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
                       ID-CRC flag = True:No error False:error  
@@ -356,11 +358,13 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
 
     read_count = 0
     id_field = []
+    id_lists = []    # for checking ID duplication (= potential of 2nd lap) 
     id_buf = []
     mc_byte = 0
     id_ds_pos  = 0
     id_mfm_pos = 0
     mfm_count  = 0
+    idx_count  = 0   # index mark count
 
     if log_level>0: print('**Search all ID')
 
@@ -395,6 +399,12 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
                 id_ds_pos  = ds.get_pos()   # ID position in the interval buffer
                 id_mfm_pos = mfm_count-1
                 state = State.IDAM
+            elif mc_byte == 0xc2 and data == 0xfc:
+                if log_level>0: print('IDX_MARK')
+                idx_count += 1
+                if idx_count > 1 and abort_by_idxmark:
+                    if log_level>0: print('2nd index mark is detected - read aborted')
+                    break
             else:
                 state = State.IDLE
 
@@ -404,6 +414,10 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
+                if id_field[1:-2] in id_lists and abort_by_sameid:     # abort when the identical ID is detected
+                    if log_level>0: print('Abort by 2nd identical ID detection')
+                    break
+                id_lists.append(id_field[1:-2])   # remove DataAM and CRC
                 if crc.get()==0:
                     id_buf.append(id_field[1:] + [True, id_ds_pos, id_mfm_pos])  #id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
                     if log_level>0: print("CRC - OK ({:02x},{:02x},{:02x},{:02x}) - {}, {}".format(id_field[1], id_field[2], id_field[3], id_field[4], id_ds_pos, id_mfm_pos))
@@ -542,7 +556,7 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, spin_spd=0.2, hig
 
 
 
-def read_all_sectors(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
+def read_all_sectors(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0, abort_by_idxmark=True, abort_by_sameid=True):
     """
     Read all sector data in a track  
     Return:  
@@ -558,7 +572,8 @@ def read_all_sectors(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low
     if log_level==2:
         print('Read all sectors')
 
-    id_list = search_all_idam(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level)
+    id_list = search_all_idam(interval_buf, clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain, log_level=log_level,
+                     abort_by_idxmark=abort_by_idxmark, abort_by_sameid=abort_by_sameid)
     for id_field in id_list:
         sect    = id_field[2]
         idcrc   = id_field[6]

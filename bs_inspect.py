@@ -135,7 +135,8 @@ def mfm_dump(interval, spin_spd, args):
 
 #      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
 def id_dump(interval, spin_spd, args):
-    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
+                    abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     print(' # : (C ,H ,R ,N ) ID-CRC CRC-val')
     for i, idam in enumerate(id_buf):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {}    0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', idam[8]))
@@ -149,7 +150,8 @@ def generate_key(track):
 def read_sectors(interval_buf, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
+                        abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
     for i, sect in enumerate(track):
         idam = sect[0]
@@ -161,6 +163,24 @@ def read_sectors(interval_buf, spin_spd, args):
             idam[8]))
     print('OK={}, Error={}'.format(sec_read, sec_err))
 
+def ascii_dump(interval_buf, spin_spd, args):
+    # track = [[id_field, Data-CRC status, sect_data, DAM],...]
+    #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
+    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
+                    abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
+    for i, sect in enumerate(track):
+        idam = sect[0]
+        print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {:6} {} 0x{:04x}'.format(i+1, 
+            idam[0], idam[1], idam[2], idam[3], 
+            'OK '   if idam[6] else 'ERR',
+            'OK '   if sect[1] else 'ERR',
+            'DAM  ' if sect[3] else 'DDAM ',
+            idam[8]))
+        for dt in sect[2]:
+            if dt>=0x20 and dt<=0x7e:
+                print(chr(dt), end='', flush=True)
+        print()
 
 def main(args):
     bs = bitstream()
@@ -190,6 +210,8 @@ def main(args):
             id_dump(interval_buf, spin_speed, args)
         if args.read_sectors:
             read_sectors(interval_buf, spin_speed, args)
+        if args.ascii_dump:
+            ascii_dump(interval_buf, spin_speed, args)
 
 
 if __name__ == '__main__':
@@ -204,7 +226,10 @@ if __name__ == '__main__':
     parser.add_argument('--histogram', action='store_true', default=False, help='display histogram of the pulse interval buffer')
     parser.add_argument('--history', action='store_true', default=False, help='display history graph of the pulse interval buffer')
     parser.add_argument('--mfm_dump', action='store_true', default=False, help='display MFM decoded data in HEX dump style')
+    parser.add_argument('--ascii_dump', action='store_true', default=False, help='display printable data in the sectors')
     parser.add_argument('--id_dump', action='store_true', default=False, help='display decoded all ID address marks in the track')
     parser.add_argument('--read_sectors', action='store_true', default=False, help='read all sectors in the track and display result')
+    parser.add_argument('--abort_index', action='store_true', default=False, help='abort ID reading on 2nd index mark detection')
+    parser.add_argument('--abort_id', action='store_true', default=False, help='abort ID reading on 2nd identical ID detection')
     args = parser.parse_args()
     main(args)
