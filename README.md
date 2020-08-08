@@ -26,7 +26,7 @@ The system consists with hardware and software:
 |`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield (`./fdcapture/fdcapture.ino`)|
 |`transfer.py`|Transfers raw bitstream data from Arduino to PC|
 |`fdcapture.ino`|Arduino firmware for controlling floppy disk shield|
-|`bs2d77.py`|Bit-stream data to emulator disk image (.D77/D88) converter.|
+|`bs2d77.py`|Bit-stream data to emulator disk image (.D77/D88) converter. The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md).|
 |`bs_inspect.py`|Data inspection/analyze tool for bit-stream data|
 |`d77_inspect.py`|Data inspection/analyze tool for D77/D88 disk image data|
 |`floppylib.py`|A library which provides fundamental floppy disk functions. This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
