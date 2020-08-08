@@ -1,6 +1,10 @@
 # Floppy Disk Shield for Arduino UNO
 
-* **The project is still WIP** *
+## Caveat  
+- **The project is still WIP**
+- Hardware compatibility (especially, FDD and FD-Shield compatibility) is not guaranteed
+- The magnetic flux power on the old floppy disks are dropping and getting weak as time passes. Read-out data integrity with this system is not guaranteed.
+- Recommended to use newer FDD. The old FDD may have problem on the magnetic head such as contamination, worn out or mechanical misalignment.
 
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
