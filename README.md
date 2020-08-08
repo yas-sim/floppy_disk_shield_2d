@@ -1,5 +1,31 @@
 # Floppy Disk Shield for Arduino UNO
 
+* **The project is still WIP** *
+
+## Description
+This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
+
+The system consists with hardware and software:  
+**Hardware**  
+|Item|Description|
+|:----|:----|
+|Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
+|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available|
+|Floppy drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive|  
+
+**Software**  
+
+|Name|Description|
+|:--------|:-----------|
+|`transfer.py`|Transfers raw bitstream data from Arduino to PC|
+|`fdcapture.ino`|Arduino firmware for controlling floppy disk shield|
+|`bs2d77.py`|Bit-stream data to emulator disk image (.D77/D88) converter.|
+|`bs_inspect.py`|Data inspection/analyze tool for bit-stream data|
+|`d77_inspect.py`|Data inspection/analyze tool for D77/D88 disk image data|
+|`floppylib.py`|A library which provides fundamental floppy disk functions. This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
+|`d77dec.py`|Convert D77/D88 disk image data to JSON (plane text) data|
+|`d77enc.py`|Generate D77/D88 disk image data from JSON data|
+|`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
 
 
 ### System Diagram
@@ -8,9 +34,9 @@
 ### FD-Shield - How It Works
 ![FD_Shield How it works](resources/fd-shield1.jpg)
 
-### MFM Missing Clock Patterns
+---------
+
 ![MFM Missing Clock Patterns](resources/missing_clock.jpg)
 
-### MFM Decoder Byte Synchronization
 ![system_diagram](resources/byte_sync.jpg)
 
