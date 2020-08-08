@@ -14,13 +14,14 @@ The system consists with hardware and software:
 |Item|Description|
 |:----|:----|
 |Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
-|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available|
+|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)|
 |Floppy drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive|  
 
 **Software**  
 
 |Name|Description|
 |:--------|:-----------|
+|`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield (`./fdcapture/fdcapture.ino`)|
 |`transfer.py`|Transfers raw bitstream data from Arduino to PC|
 |`fdcapture.ino`|Arduino firmware for controlling floppy disk shield|
 |`bs2d77.py`|Bit-stream data to emulator disk image (.D77/D88) converter.|
