@@ -30,6 +30,7 @@ The system consists with hardware and software:
 |`d77dec.py`|Convert D77/D88 disk image data to JSON (plane text) data|
 |`d77enc.py`|Generate D77/D88 disk image data from JSON data|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
+|`kfx2bs.py`|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and convert it|
 
 
 ### System Diagram
