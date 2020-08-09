@@ -79,6 +79,7 @@ python bs2d77.py -i image_name.raw
 |:----|:----|:----:|:----|
 |YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7|
 |MD5201|Canon|5.25"|2D, 300rpm|
+|FD-55B-01-U 19307110-01|TEAC|5.25"|2D, 300rpm|
 |FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
 |YD625-1525|YE-Data|3.5"|2D, 300rpm, for Fujitsu FM-77|
 |FD-235HG 19307773-04|TEAC|3.5"|2DD/2HD, 300/360rpm, Fixed to DS1|
