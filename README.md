@@ -70,13 +70,19 @@ python bs2d77.py -i image_name.raw
 
 - Windows 10 1909
 - Arduino UNO
+- FDDs (table below)
 
 |P/N|Mfg|FF|Description|
 |---|----|----|----|
 |FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
 |FD-235HG 19307773-04|TEAC|3.5"|2DD/2HD, 300/360rpm, Fixed to DS1|
-|YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7 (1984-11)|
-|YD625-1525|YE-Data|3.5"|2D, 300rpm, Fujitsu for FM-77|
+|YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7|
+|YD625-1525|YE-Data|3.5"|2D, 300rpm, for Fujitsu FM-77|
+|MD5201|Canon|5.25"|2D, 300rpm|
+|OSD E26J|Citizen|3.5"|2DD/2HD, 300/360rpm, for PX9821Xa?|
+|JU-256A236P|Panasonic|3.5"|2DD/2HD, 300/360rpm, for DOS/V|
+|FD1231T 134-506790-011-0|NEC|3.5"|2DD/2HD, 300/360rpm, for PC9821|
+|DF354H068C|ALPS|3.5"|2DD/2HD, 300/360rpm, for DOS/V|
 
 ---------------
 
