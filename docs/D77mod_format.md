@@ -12,15 +12,17 @@
 |0x0020|4 * 164 (0x290)|sector data table (0-163 track)|
 |0x02b0|4 * 164 (0x290)|(mod)**track data table (0-163 track) 0=No track data or dirty track**|
   
-  
-**Track data (+0x540)**
+<br>
+
+**(mod)Track data (+0x540 (=0x20+0x290+0x290))**  
 |offset|size|contents|
 |----|----|----|
 |0x0000|4|(mod)**track data size**|
 |0x0004|variable|(mod)**track data**|
+
+<br>
   
-  
-**Sector data**
+**Sector data** (+0x2b0 when without track data, +??? with track data)  
 |offset|size|contents|
 |----|----|----|
 |0x0000|1|C|

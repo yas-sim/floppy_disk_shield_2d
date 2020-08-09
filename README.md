@@ -1,10 +1,11 @@
 # Floppy Disk Shield for Arduino UNO
 
-## Caveat  
+## Caveat and Disclaimer - Read before you build a fd-shield  
 - **The project is still WIP**
-- Hardware compatibility (especially, FDD and FD-Shield compatibility) is not guaranteed
+- I don't own any responsibility for the data loss or physical damage on your floppy disks or computer assets caused by the use of hardware and software included in this project.
+- Hardware compatibility (especially, FDD and FD-Shield compatibility) is not guaranteed. Your FDD may now work with the FD-Shield.  
 - The magnetic flux power on the old floppy disks are dropping and getting weak as time passes. Read-out data integrity with this system is not guaranteed.
-- Recommended to use newer FDD. The old FDD may have problem on the magnetic head such as contamination, worn out or mechanical misalignment.
+- Recommended to use newer FDD. The old FDD may have problems on the magnetic head such as contamination, worn out or mechanical misalignment.
 
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
@@ -34,29 +35,54 @@ The system consists with hardware and software:
 |`d77enc.py`|Generate D77/D88 disk image data from JSON data|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
 |`kfx2bs.py`|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and convert it|
-
-
 ### System Diagram
 ![system_diagram](resources/fd-shield.jpg)
 
-### FD-Shield - How It Works
+## FD-Shield - How It Works
 ![FD_Shield How it works](resources/fd-shield1.jpg)
 
 ---------
 
-![MFM Missing Clock Patterns](resources/missing_clock.jpg)
+## How to use (the most simple way)
 
-![system_diagram](resources/byte_sync.jpg)
+1. Build Floppy shield for Arduino UNO  
+- PCB design files can be found in the `./kicad` directory
+2. Burn the floppy disk shield firmware (sketch) to Arduino UNO  
+Use `fdcapture.ino`
+3. Assemble the system
+- Attach a floppy shield to an Arduino UNO
+- Connect a floppy shield and a floppy disk drive with a 36pin ribon cable
+- Connect Arduino UNO to PC via USB cable
+4. Read raw bit-stream data from a floppy disk  
+- Insert a 2D floppy disk to the floppy disk drive (FDD) -- 2DD floppy disk can be read but it requires a simple code modification to change head seek method on `fdcapture.ino`.
+- Run following command on the Windows PC:
+```sh
+python transfer.py -o image_name.raw
+```
+- `transfer.py` will search COM port for Arduino UNO and use it.
+5. Convert raw bit-stream data into emulator image data (D77mod)
+```sh
+python bs2d77.py -i image_name.raw
+```
+- `image_name.d77` will be generated.
 
 ## Test Environment
 
 - Windows 10 1909
 - Arduino UNO
 
-|FDD|Mfg|FF|Description|
+|P/N|Mfg|FF|Description|
 |---|----|----|----|
-|FD55-GFR|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
-|FD-235HG|TEAC|3.5"|2DD/2HD, 300/(360)rpm, dual-mode?|
-|YD-580|YE-Data|5.25"|2D, 300rpm, for FM-7 (1984-11)|
-|YD625-1525|YE-Data|3.5"|2D, 300rpm, for FM-77|
+|FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
+|FD-235HG 19307773-04|TEAC|3.5"|2DD/2HD, 300/360rpm, Fixed to DS1|
+|YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7 (1984-11)|
+|YD625-1525|YE-Data|3.5"|2D, 300rpm, Fujitsu for FM-77|
+
+---------------
+
+## Addendum
+
+![MFM Missing Clock Patterns](resources/missing_clock.jpg)
+
+![system_diagram](resources/byte_sync.jpg)
 
