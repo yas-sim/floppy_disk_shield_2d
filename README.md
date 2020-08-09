@@ -9,28 +9,30 @@
 
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
+The system can preserve entire floppy disk data regardless whether it's normal or not. That means the system can read and preserve copy protect information in the bit-stream file as it is.  
+The recorded bit-stream file can be decoded and restore the contents anytime later.  
 The system includes a bit-stream data to D77/D88 emulator disk image converter. You can generate the disk images from the phicical floppy disks.  
 
-The system consists with hardware and software:  
+The system consists of the hardware and software:  
 
 **Hardware**  
 |Item|Description|
 |:----|:----|
 |Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
 |Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)|
-|Floppy drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive|  
+|Floppy disk drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive. The FD-shield can detect the track density (2D or 2DD/2HD, 80 tracks or 160 tracks) and spindle spin speed (300rpm or 360rpm)|  
 
 **Software**  
 
 |Name|Description|
 |:--------|:-----------|
-|`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield (`./fdcapture/fdcapture.ino`)|
+|`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
 |`transfer.py`|Transfers raw bitstream data from Arduino to PC|
 |`fdcapture.ino`|Arduino firmware for controlling floppy disk shield|
-|`bs2d77.py`|Bit-stream data to emulator disk image (D77/D88) converter. The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod is backward compatible with the standard D77 disk images. You can use the D77mod image with emulators which supports D77/D88 image data.|
+|`bs2d77.py`|Bit-stream data to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod is backward compatible with the standard D77 disk images. You can use the D77mod image with emulators which supports D77/D88 image data.|
 |`bs_inspect.py`|Data inspection/analyze tool for bit-stream data|
 |`d77_inspect.py`|Data inspection/analyze tool for D77/D88 disk image data|
-|`floppylib.py`|A library which provides fundamental floppy disk functions. This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
+|`floppylib.py`|A library which provides fundamental floppy disk functions.<br> This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
 |`d77dec.py`|Convert D77/D88 disk image data to JSON (plane text) data|
 |`d77enc.py`|Generate D77/D88 disk image data from JSON data|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
@@ -74,11 +76,11 @@ python bs2d77.py -i image_name.raw
 
 |P/N|Mfg|FF|Description|
 |---|----|----|----|
-|FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
-|FD-235HG 19307773-04|TEAC|3.5"|2DD/2HD, 300/360rpm, Fixed to DS1|
 |YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7|
-|YD625-1525|YE-Data|3.5"|2D, 300rpm, for Fujitsu FM-77|
 |MD5201|Canon|5.25"|2D, 300rpm|
+|FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
+|YD625-1525|YE-Data|3.5"|2D, 300rpm, for Fujitsu FM-77|
+|FD-235HG 19307773-04|TEAC|3.5"|2DD/2HD, 300/360rpm, Fixed to DS1|
 |OSD E26J|Citizen|3.5"|2DD/2HD, 300/360rpm, for PX9821Xa?|
 |JU-256A236P|Panasonic|3.5"|2DD/2HD, 300/360rpm, for DOS/V|
 |FD1231T 134-506790-011-0|NEC|3.5"|2DD/2HD, 300/360rpm, for PC9821|
