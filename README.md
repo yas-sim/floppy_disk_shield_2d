@@ -19,7 +19,7 @@ The system consists of the hardware and software:
 |Item|Description|
 |:----|:----|
 |Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
-|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)|
+|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)<br>Rev.A design has bugs. Rev.B and beyond are basically comatible and has same function.|
 |Floppy disk drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive. The FD-shield can detect the track density (2D or 2DD/2HD, 80 tracks or 160 tracks) and spindle spin speed (300rpm or 360rpm)|  
 
 **Software**  
@@ -72,10 +72,11 @@ python bs2d77.py -i image_name.raw
 
 - Windows 10 1909
 - Arduino UNO
+- Floppy disk shield for Arduino
 - FDDs (table below)
 
 |P/N|Mfg|FF|Description|
-|---|----|----|----|
+|:----|:----|:----:|:----|
 |YD-580 1354|YE-Data|5.25"|2D, 300rpm, for Fujitsu FM-7|
 |MD5201|Canon|5.25"|2D, 300rpm|
 |FD55-GFR 19307673-93|TEAC|5.25"|2DD/2HD, 360rpm, for DOS/V|
