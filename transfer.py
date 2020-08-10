@@ -41,6 +41,12 @@ def main(args):
             if len(line)==0:
                 continue
             line = line.decode(encoding='ascii', errors='ignore')
+            if line[:5] == '++CMD':         # Command prompt
+                media_type = 1 if args.media_type == '2DD' else 0 
+                uart.write('+R {} {} {} {}\n'.format(args.start_track, args.end_track, media_type, args.read_overlap).encode('ascii'))
+                f.write('**TRACK_RANGE {} {}\n'.format(args.start_track, args.end_track))
+                f.write('**MEDIA_TYPE {}\n'.format(args.media_type))
+                f.write('**OVERLAP {}\n'.format(args.read_overlap))
             if line[:2] == '**':
                 print('\n' + line)
             if line[:7] == '**START':
@@ -59,6 +65,12 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output raw bit stream file name (Default=fdshield_(date-time).log')
+    parser.add_argument('--start_track', type=int, required=False, default=0, help='start track number')
+    parser.add_argument('--end_track', type=int, required=False, default=79, help='end track number')
+    parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D or 2DD)')
+    parser.add_argument('--read_overlap', type=int, required=False, default=20, help='track read 2nd lap overlap percentage (default = 20 %)')
     args = parser.parse_args()
 
     main(args)
+
+# command format "+R strack etrack mode overlap"

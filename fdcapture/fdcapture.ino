@@ -1,5 +1,7 @@
 // 2D/2DD Floppy disk capture shield control software
 
+#include <stdio.h>
+
 #include <SPI.h>
 #include <avr/pgmspace.h>
 
@@ -23,19 +25,19 @@
 
 #define STEP_RATE     (10)  /* ms */
 
-size_t g_spin_ms;     // FDD spin speed (ms)
-
+size_t g_spin_ms;         // FDD spin speed (ms)
 
 // This class changes the configuration of Timer 1 for disc rotate speed measurement purpose
 class FDD {
   private:
-    int drive_mode;     // 0=2D, 1=2DD/2HD
+    int drive_type;     // 0=2D, 1=2DD/2HD
+    int media_type;     // 0=2D, 1=2DD/2HD
   public:
     FDD() {}
 
     enum ENUM_DRV_MODE {
-      mode_2d,
-      mode_2dd
+      mode_2d  = 0,
+      mode_2dd = 1
     };
 
 
@@ -53,23 +55,34 @@ class FDD {
       digitalWrite(FD_DIR,        HIGH);  // - direction
       digitalWrite(FD_STEP,       HIGH);
 
-      set_drive_mode(0); // 2D
+      set_drive_type(0); // 2D
 
       motor(true);      // motor on
       head(true);       // head load on
       side(0);          // side 0
     }
 
-    void set_drive_mode(int mode) {
-      drive_mode = mode;
+    void set_drive_type(enum ENUM_DRV_MODE mode) {
+      drive_type = mode;
     }
 
-    inline void get_drive_mode(void) {
-      return drive_mode;
+    inline enum ENUM_DRV_MODE get_drive_type(void) {
+      return drive_type;
+    }
+
+    void set_media_type(enum ENUM_DRV_MODE mode) {
+      media_type = mode;
+    }
+
+    inline enum ENUM_DRV_MODE get_media_type(void) {
+      return media_type;
     }
 
     void step(void) {
-      int iter = drive_mode == ENUM_DRV_MODE::mode_2dd ? 2 : 1;
+      int iter = 1;
+      if(media_type == ENUM_DRV_MODE::mode_2d && drive_type == ENUM_DRV_MODE::mode_2dd) { 
+        iter = 2;
+      }
       for (int i = 0; i < iter; i++) {
         digitalWrite(FD_STEP, LOW);
         delay(STEP_RATE/2);
@@ -149,19 +162,19 @@ class FDD {
       }
     }
 
-    void detect_drive_mode(void) {
-      set_drive_mode(FDD::ENUM_DRV_MODE::mode_2d);
+    void detect_drive_type(void) {
+      set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
       track00();
       seek(0,44);
       seek(42,0);
+      Serial.print(F("**DRIVE_TYPE "));
       if(readTRK00()==LOW) {
-        set_drive_mode(FDD::ENUM_DRV_MODE::mode_2d);
-        Serial.print(F("**2D"));
+        set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
+        Serial.println(F("2D"));
       } else {
-        set_drive_mode(FDD::ENUM_DRV_MODE::mode_2dd);
-        Serial.print(F("**2DD"));
+        set_drive_type(FDD::ENUM_DRV_MODE::mode_2dd);
+        Serial.println(F("2DD"));
       }
-      Serial.println(F(" drive is detected"));
     }
 
     // TCNT1 = 250KHz count
@@ -474,7 +487,7 @@ void revolution_calibration(void) {
 
 
 // Read single track
-void trackRead(void) {
+void trackRead(int read_overlap) {
   SPISRAM.beginWrite();
   SPISRAM.hold(LOW);
   SPISRAM.disconnect();           // Disconnect SPI SRAM from Arduino
@@ -487,9 +500,7 @@ void trackRead(void) {
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
   FDD.waitIndex();
-  delay(40);
-  //delay((g_spin_ms*2) / 100);          // 2% over capturing (read overlap)
-  //delay((g_spin_ms*5) / 100);          // 5% over capturing (read overlap)
+  delay((g_spin_ms * read_overlap) / 100);  // (overlap)% over capturing (read overlap)
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
@@ -501,7 +512,7 @@ void trackRead(void) {
 
 
 // Read tracks  (track # = 0-79 (,83))
-void read_tracks(int start_track, int end_track) {
+void read_tracks(int start_track, int end_track, int read_overlap) {
   FDD.track00();
   size_t curr_trk = 0;
   for (size_t trk = start_track; trk <= end_track; trk++) {
@@ -518,7 +529,7 @@ void read_tracks(int start_track, int end_track) {
     Serial.print(F(" "));
     Serial.println(fdd_side);
 
-    trackRead();
+    trackRead(read_overlap);
 
     dumpTrack_encode(TRACK_CAPACITY);
     Serial.println(F("**TRACK_END"));
@@ -551,6 +562,21 @@ void timing_light(int freq) {
 }
 
 
+#define cmdBufSize (20)
+
+void readLine(byte buf[], const size_t buf_size) {
+  byte ch;
+  size_t pos = 0;
+  buf[0] = '\0';
+  while(pos<buf_size) {
+    while(Serial.available()==0);
+    ch = Serial.read();
+    if(ch == '\n') break;
+    buf[pos++] = ch;
+    buf[pos] = '\0';
+  }
+}
+
 
 void setup() {
   // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
@@ -565,42 +591,62 @@ void setup() {
   SPISRAM.clear();
 }
 
-
+// Command format
+// "+R strack etrack mode overlap"
+// "+T freq"
+// "+V"
 void loop() {
+  byte cmdBuf[cmdBufSize+1];
+  char cmd;
+
   Serial.println("");
   Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
-  //timing_light(50);
-  //revolution_calibration();
 
-  // Detect FDD type (2D/2DD)
-  FDD.detect_drive_mode();
-  FDD.track00();
+  Serial.println(F("++CMD"));
+  readLine(cmdBuf, cmdBufSize);
+  cmd = cmdBuf[1];
 
-  delay(3 * 1000);
+  if(cmd == 'R' || cmd == 'r') {
+    enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
+    int start_track = 0, end_track = 79;
+    int read_overlap = 20;   // track read overlap (%)
+    sscanf(cmdBuf, "+%c %d %d %d %d", &cmd, &start_track, &end_track, &media_mode, &read_overlap);
+    Serial.println(F("**START"));
 
-  Serial.println(F("**START"));
-  
-  // Measure FDD spindle speed
-  float spin = 0.f;
-  for(int i=0; i<5; i++) {
-    spin += FDD.measure_rpm();
+    // Detect FDD type (2D/2DD)
+    FDD.detect_drive_type();
+    FDD.track00();
+
+    // Measure FDD spindle speed
+    float spin = 0.f;
+    for(int i=0; i<5; i++) {
+      spin += FDD.measure_rpm();
+    }
+
+    spin /= 5;
+    Serial.print(F("**SPIN_SPD "));
+    Serial.println(spin,8);
+    g_spin_ms = (int)(spin*1000);
+
+    // Read all tracks
+    read_tracks(start_track, end_track, read_overlap);
+
+    Serial.println(F("**COMPLETED"));
   }
-  spin /= 5;
-  Serial.print(F("**SPIN_SPD "));
-  Serial.println(spin,8);
-  g_spin_ms = (int)(spin*1000);
-
-  // Read all tracks
-  //  2D: 0 to 79 (83 for over tracks)
-  // 2DD: 0 to 159 (163 for over tracks)
-  read_tracks(0, 79);
-  //read_tracks(0, 159);
-
-  Serial.println(F("**COMPLETED"));
+  if(cmd == 'T' || cmd == 't') {
+    int freq;
+    sscanf(cmdBuf, "+%c %d", &cmd, &freq);
+    Serial.println("**Timing light mode");
+    timing_light(freq);
+  }
+  if(cmd == 'V' || cmd == 'v') {
+    Serial.println("**Revolution calibration mode");
+    revolution_calibration();
+  }
 
   FDD.head(false);
   FDD.motor(false);
 
-  // Stop
-  while (true) delay(100);
+  // Halt
+  //while (true) delay(100);
 }

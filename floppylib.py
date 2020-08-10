@@ -165,7 +165,7 @@ class data_separator:
 
     def set_gain(self, high_gain, low_gain):
         self.high_gain = high_gain
-        self.low_gain = low_gain
+        self.low_gain  = low_gain
 
     def switch_gain(self, gain_mode):
         if gain_mode == 1:
@@ -215,8 +215,9 @@ class data_separator:
         try:
             error = interval / quant_interval - self.cell_size
         except ZeroDivisionError:
-            error = 0
-        self.cell_size += error * self.gain               # Correct the cell_size
+            pass
+        else:
+            self.cell_size += error * self.gain             # Adjust the cell_size
 
         # cell size range limitter
         self.cell_size = max(self.cell_size, self.cell_size_min)

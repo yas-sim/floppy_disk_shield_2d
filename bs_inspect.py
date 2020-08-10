@@ -72,7 +72,7 @@ def timing_history(interval_buf, spin_spd, args):
     ystep=1
     xstep = 4
     cell = 8
-    height = 400
+    height = 600
     writer = cv2.VideoWriter('history.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (val_max*xstep, height))
 
     ds = data_separator(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain)
@@ -100,10 +100,11 @@ def timing_history(interval_buf, spin_spd, args):
             img[:-2, :, :] = img[2:, :, :]  # scroll up
             img[-2:, :, :] = [0,0,0]
             for j in range(2,4+1):
-                img[-1, int(j * cell * xstep), :] = [ 0, 0, 255 ]
+                img[-1, int(j * cell * xstep), :] = [ 0, 0, 255 ]       # current cell position line
+                #img[-1, int(j *    8 * xstep), :] = [ 0, 255, 255 ]    # standard cell position line
             for j in range(1,4+1):
-                img[-1, int((j+0.5) * cell * xstep), :] = [ 255, 0, 0 ]
-        img[-1, interval * xstep, : ] = [ 255, 255, 255]
+                img[-1, int((j+0.5) * cell * xstep), :] = [ 255, 0, 0 ] # cell limit line
+        img[-1, interval * xstep, : ] = [ 255, 255, 255]                # data point
 
 
 def histogram(interval_buf):
@@ -133,13 +134,13 @@ def mfm_dump(interval, spin_spd, args):
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
     dumpMFM(mfm_buf, mc_buf)
 
-#      id_buf : [ [C,H,R,N, CRC flag, pos], ...]  
+#   id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]  
 def id_dump(interval, spin_spd, args):
     id_buf = search_all_idam(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
                     abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     print(' # : (C ,H ,R ,N ) ID-CRC CRC-val')
     for i, idam in enumerate(id_buf):
-        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {}    0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', idam[8]))
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {}    0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', (idam[4]<<8)+idam[5]))
 
 def generate_key(track):
     trk = track // 2
