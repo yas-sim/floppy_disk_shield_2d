@@ -14,11 +14,11 @@ The recorded bit-stream file can be decoded and restore the contents anytime lat
 The system includes a bit-stream data to D77/D88 emulator disk image converter. You can generate the disk images from the phicical floppy disks.  
 これは古い2D/2DDフロッピーディスクのデータを保存するためのシステムを作るプロジェクトです。  
 このシステムを使うことで仕様にのっとった正しい信号も非正規の信号も全てそのまま保存することが可能です。つまり、このシステムではコピープロテクトのための情報まで含めてビットストリームデータとして保存することが可能です。  
-記録されたビットストリームデータは後でデコード、解読を行うことで情報を取り出すことが可能です。　　
+記録されたビットストリームデータは後でデコード、解読を行うことで情報を取り出すことが可能です。  
 このシステムにはビットストリームデータからエミュレータ互換のイメージファイル(D77/D88)を生成するためのコンバーターも含んでいます。実際のフロッピーを読み取り、ディスクイメージを生成することが可能です。  
 
 The system consists of the hardware and software:  
-システムはハードウエアとソフトウエアから校正されます:
+システムはハードウエアとソフトウエアから構成されます:
 
 **Hardware**  
 |Item|Description|
