@@ -69,9 +69,10 @@ python transfer.py -o image_name.raw
 - `transfer.py` will search COM port for Arduino UNO and use it.
 5. Convert raw bit-stream data into emulator image data (D77mod) -- ビットストリームからディスクイメージファイルを生成
 ```sh
-python bs2d77.py -i image_name.raw
+python bs2d77.py -i image_name.raw --abort_id
 ```
-- `image_name.d77` will be generated.
+- `image_name.d77` will be generated.  
+**Note:** The `--abort_id` option enables abort reading track image when the same sector ID is detected. The FD-shield can read the top of the 2nd lap with `--read_overlap` option. This overlapped track data may contain the same sector data twice. This option will prevent from generating the same sector in a track.  
 
 ## Test Environment
 

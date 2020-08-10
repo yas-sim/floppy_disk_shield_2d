@@ -68,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--start_track', type=int, required=False, default=0, help='start track number')
     parser.add_argument('--end_track', type=int, required=False, default=79, help='end track number')
     parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D or 2DD)')
-    parser.add_argument('--read_overlap', type=int, required=False, default=20, help='track read 2nd lap overlap percentage (default = 20 %)')
+    parser.add_argument('--read_overlap', type=int, required=False, default=0, help='track read 2nd lap overlap percentage (default = 0 %)')
     args = parser.parse_args()
 
     main(args)
