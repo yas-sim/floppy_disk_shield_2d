@@ -604,9 +604,9 @@ void loop() {
 
   Serial.println(F("++CMD"));
   readLine(cmdBuf, cmdBufSize);
-  cmd = cmdBuf[1];
+  cmd = toupper(cmdBuf[1]);
 
-  if(cmd == 'R' || cmd == 'r') {
+  if(cmd == 'R') {
     enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
     int start_track = 0, end_track = 79;
     int read_overlap = 20;   // track read overlap (%)
@@ -633,15 +633,39 @@ void loop() {
 
     Serial.println(F("**COMPLETED"));
   }
-  if(cmd == 'T' || cmd == 't') {
+  if(cmd == 'T') {
     int freq;
     sscanf(cmdBuf, "+%c %d", &cmd, &freq);
-    Serial.println("**Timing light mode");
+    Serial.println(F("**Timing light mode"));
     timing_light(freq);
   }
-  if(cmd == 'V' || cmd == 'v') {
-    Serial.println("**Revolution calibration mode");
+  if(cmd == 'V') {
+    Serial.println(F("**Revolution calibration mode"));
     revolution_calibration();
+  }
+  if(cmd == 'S') {
+    Serial.println(F("**Seek mode"));
+    int current_track = 0, target_track, side, val;
+    FDD.track00();
+    while(true) {
+      readLine(cmdBuf, cmdBufSize);
+      sscanf(cmdBuf, "%d", &val);
+      if(val==0) {
+        Serial.println(F("TRK00"));
+        FDD.track00();
+        target_track = 0;
+        side = 0;
+      } else {
+        side         = val % 2;
+        target_track = val / 2;
+        FDD.seek(current_track, target_track);
+      }
+      FDD.side(side);
+      Serial.print(target_track);
+      Serial.print(" ");
+      Serial.println(side);
+      current_track = target_track;
+    }
   }
 
   FDD.head(false);

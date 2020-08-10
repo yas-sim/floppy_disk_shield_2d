@@ -96,3 +96,13 @@ python bs2d77.py -i image_name.raw
 
 ![system_diagram](resources/byte_sync.jpg)
 
+### FD-shield - 3D view
+![3D](resources/fdshield-3d.jpg)
+
+### FD-shield - Schematics
+![schematics](resources/fdshield.svg)
+[PDF](resources/fdshield-schematics.pdf)
+
+### FD-shield - Board design file
+![BRD](resources/fdshield-brd.svg)
+
