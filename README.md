@@ -12,14 +12,19 @@ This is a project to develop a system for preserving old 2D/2DD floppy disk data
 The system can preserve entire floppy disk data regardless whether it's normal or not. That means the system can read and preserve copy protect information in the bit-stream file as it is.  
 The recorded bit-stream file can be decoded and restore the contents anytime later.  
 The system includes a bit-stream data to D77/D88 emulator disk image converter. You can generate the disk images from the phicical floppy disks.  
+これは古い2D/2DDフロッピーディスクのデータを保存するためのシステムを作るプロジェクトです。  
+このシステムを使うことで仕様にのっとった正しい信号も非正規の信号も全てそのまま保存することが可能です。つまり、このシステムではコピープロテクトのための情報まで含めてビットストリームデータとして保存することが可能です。  
+記録されたビットストリームデータは後でデコード、解読を行うことで情報を取り出すことが可能です。　　
+このシステムにはビットストリームデータからエミュレータ互換のイメージファイル(D77/D88)を生成するためのコンバーターも含んでいます。実際のフロッピーを読み取り、ディスクイメージを生成することが可能です。  
 
 The system consists of the hardware and software:  
+システムはハードウエアとソフトウエアから校正されます:
 
 **Hardware**  
 |Item|Description|
 |:----|:----|
 |Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
-|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)<br>Rev.A design has bugs. Rev.B and beyond are basically comatible and has same function.|
+|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)<br>Rev.A design has bugs. Rev.B and beyond are basically comatible and has same function.<br>KiCAD用のPCBの設計データも提供されています(./kicad/*)<br>Rev.Aにはバグがあります。Rev.B以降は基本的に同じ機能です|
 |Floppy disk drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive. The FD-shield can detect the track density (2D or 2DD/2HD, 80 tracks or 160 tracks) and spindle spin speed (300rpm or 360rpm)|  
 
 **Software**  
@@ -45,24 +50,24 @@ The system consists of the hardware and software:
 
 ---------
 
-## How to use (the most simple way)
+## How to use - 使い方
 
-1. Build Floppy shield for Arduino UNO  
+1. Build Floppy shield for Arduino UNO - シールド製作  
 - PCB design files can be found in the `./kicad` directory
-2. Burn the floppy disk shield firmware (sketch) to Arduino UNO  
+2. Burn the floppy disk shield firmware (sketch) to Arduino UNO - Arduio UNOにファームウエアを書き込む  
 Use `fdcapture.ino`
-3. Assemble the system
+3. Assemble the system - システムを接続
 - Attach a floppy shield to an Arduino UNO
 - Connect a floppy shield and a floppy disk drive with a 36pin ribon cable
 - Connect Arduino UNO to PC via USB cable
-4. Read raw bit-stream data from a floppy disk  
+4. Read raw bit-stream data from a floppy disk - フロッピーからビットストリームデータを生成  
 - Insert a 2D floppy disk to the floppy disk drive (FDD) -- 2DD floppy disk can be read but it requires a simple code modification to change head seek method on `fdcapture.ino`.
 - Run following command on the Windows PC:
 ```sh
 python transfer.py -o image_name.raw
 ```
 - `transfer.py` will search COM port for Arduino UNO and use it.
-5. Convert raw bit-stream data into emulator image data (D77mod)
+5. Convert raw bit-stream data into emulator image data (D77mod) -- ビットストリームからディスクイメージファイルを生成
 ```sh
 python bs2d77.py -i image_name.raw
 ```
