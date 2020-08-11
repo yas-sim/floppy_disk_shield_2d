@@ -28,7 +28,7 @@ def main(args):
 
     # generate output file name
     if args.output is None:
-        log_file = 'fdshield_{}.log'.format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+        log_file = 'fdshield_{}.raw'.format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
     else:
         log_file = args.output
     print('Raw bit stream file :', log_file)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     print('** Floppy shield - data transfer tool')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output raw bit stream file name (Default=fdshield_(date-time).log')
+    parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output raw bit stream file name (Default = fdshield_(DATE-TIME).raw)')
     parser.add_argument('--start_track', type=int, required=False, default=0, help='start track number')
     parser.add_argument('--end_track', type=int, required=False, default=79, help='end track number')
     parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D or 2DD)')
