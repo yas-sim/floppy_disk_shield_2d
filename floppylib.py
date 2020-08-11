@@ -155,8 +155,8 @@ class data_separator:
         self.interval_buf = interval_buf
         self.pos = 0
         self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
-        missing_clock_c2 = (0x5224)  #  [0,1,0,1, 0,0,1,0, 0,0,1,0, 0,1,0,0]
-        missing_clock_a1 = (0x4489)  #  [0,1,0,0, 0,1,0,0, 1,0,0,0, 1,0,0,1]
+        missing_clock_c2 = (0x5224)  #  [0,1,0,1, 0,0,1,0, *,0,1,0, 0,1,0,0]
+        missing_clock_a1 = (0x4489)  #  [0,1,0,0, 0,1,0,0, 1,0,*,0, 1,0,0,1]
         pattern_ff       = (0x5555555555555555)  # for 4 bytes of sync data (unused)
         pattern_00       = (0xaaaaaaaaaaaaaaaa)  # for 4 bytes of sync data
         self.missing_clock = [ missing_clock_c2, missing_clock_a1 ]
@@ -226,11 +226,11 @@ class data_separator:
 
     def get_pos(self):
         return self.pos
-    
+
     def set_pos(self, pos):
         if pos<len(self.interval_buf) and pos>0:
             self.pos = pos
-    
+
     def get_bit(self):  # Does VFO tracking
         while True:
             if len(self.bit_stream) > 0:
@@ -239,11 +239,11 @@ class data_separator:
             quant_interval, interval = self.get_quantized_interval()
             if quant_interval == -1:
                 return -1
-            if   quant_interval == 2:
-                self.bit_stream += [0, 1]
+            if   quant_interval <= 2:
+                self.bit_stream +=       [0, 1]
             elif quant_interval == 3:
-                self.bit_stream += [0, 0, 1]
-            elif quant_interval == 4:
+                self.bit_stream +=    [0, 0, 1]
+            elif quant_interval >= 4:
                 self.bit_stream += [0, 0, 0, 1]
 
     def get_bit_2(self):  # No VFO tracking version
@@ -257,37 +257,44 @@ class data_separator:
 
             int_interval = int(interval / self.cell_size_ref + 0.5)
             if   int_interval == 2:
-                self.bit_stream += [0, 1]
+                self.bit_stream +=       [0, 1]
             elif int_interval == 3:
-                self.bit_stream += [0, 0, 1]
+                self.bit_stream +=    [0, 0, 1]
             elif int_interval == 4:
                 self.bit_stream += [0, 0, 0, 1]
 
-                
+    # cd_data = CDCDCD... extract only D bits
+    def extract_data_bits(self, cd_data):
+        data = 0
+        bit = 0x4000
+        for i in range(8):
+            data = (data<<1) | (0 if (cd_data & bit == 0) else 1)
+            bit >>= 2
+        return data
+
+    # mode 0 = enable sync, mc detection (AM seek), 1 = disable sync, mc detection (data read)
     def get_byte(self):
-        data           = 0
         read_bit_count = 0   # read bit count
         while True:
             bit = self.get_bit()        # with VFO tracking
             #bit = self.get_bit_2()     # with fixed VFO
             if bit == -1:
                 return -1, False
-            if read_bit_count % 2 == 1:
-                data = (data<<1) | bit   # stores only data bits (skip clock bits)
             read_bit_count += 1
 
             self.cd_stream = ((self.cd_stream<<1) | bit) & 0xffffffffffffffff
-            if self.mode == 0 and ((self.cd_stream & 0x7fff) in self.missing_clock):
-                return data, True        # missing clock detected
 
-            if self.mode == 0 and (self.cd_stream in self.sync_pattern):
-                self.switch_gain(1)      # Fast tracking mode to get syncronized with SYNC pattern
-                read_bit_count &= ~1     # C/D synchronize
+            if self.mode == 0 and ((self.cd_stream & 0xffff) in self.missing_clock):  # missing clock pattern check
+                return self.extract_data_bits(self.cd_stream), True
+
+            if self.mode == 0 and (self.cd_stream in self.sync_pattern):   # SYNC pattern check
+                self.switch_gain(1)                                        # Fast tracking mode to get syncronized with SYNC pattern
+                read_bit_count &= ~1                                       # C/D synchronize
             else:
                 self.switch_gain(0)
 
             if read_bit_count >= 16:
-                return data, False       # 8 bit data read completed
+                return self.extract_data_bits(self.cd_stream), False       # 8 bit data read completed
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
