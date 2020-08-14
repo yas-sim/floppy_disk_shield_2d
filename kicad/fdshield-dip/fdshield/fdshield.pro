@@ -1,6 +1,6 @@
-update=2020/08/10 18:18:43
+update=2020/08/14 20:28:50
 version=1
-last_client=eeschema
+last_client=kicad
 [cvpcb]
 version=1
 NetIExt=net

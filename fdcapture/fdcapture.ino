@@ -78,16 +78,17 @@ class FDD {
       return media_type;
     }
 
-    void step(void) {
-      int iter = 1;
-      if(media_type == ENUM_DRV_MODE::mode_2d && drive_type == ENUM_DRV_MODE::mode_2dd) { 
-        iter = 2;
-      }
-      for (int i = 0; i < iter; i++) {
+    inline void step1(void) {
         digitalWrite(FD_STEP, LOW);
         delay(STEP_RATE/2);
         digitalWrite(FD_STEP, HIGH);
         delay(STEP_RATE/2);
+    }
+
+    void step(void) {
+      int iter = (media_type == ENUM_DRV_MODE::mode_2d) ? 1 : 2;
+      for (int i = 0; i < iter; i++) {
+        step1();
       }
     }
 

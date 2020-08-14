@@ -408,6 +408,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
                 id_mfm_pos = mfm_count-1
                 state = State.IDAM
             elif mc_byte == 0xc2 and data == 0xfc:
+                print('IDX_MARK')
                 if log_level>0: print('IDX_MARK')
                 idx_count += 1
                 if idx_count > 1 and abort_by_idxmark:
