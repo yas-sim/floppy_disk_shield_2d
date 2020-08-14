@@ -11,7 +11,7 @@
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
 The system can preserve entire floppy disk data regardless whether it's normal or not. That means the system can read and preserve copy protect information in the bit-stream file as it is.  
 The recorded bit-stream file can be decoded and restore the contents anytime later.  
-The system includes a bit-stream data to D77/D88 emulator disk image converter. You can generate the disk images from the phicical floppy disks.  
+The system includes a bit-stream data to D77/D88 emulator disk image converter. You can read the floppy disk with this tool and generate the disk images.  
 これは古い2D/2DDフロッピーディスクのデータを保存するためのシステムを作るプロジェクトです。  
 このシステムを使うことで仕様にのっとった正しい信号も非正規の信号も全てそのまま保存することが可能です。つまり、このシステムではコピープロテクトのための情報まで含めてビットストリームデータとして保存することが可能です。  
 記録されたビットストリームデータは後でデコード、解読を行うことで情報を取り出すことが可能です。  
@@ -24,7 +24,7 @@ The system consists of the hardware and software:
 |Item|Description|
 |:----|:----|
 |Arduino UNO|Arduino UNO. The firmware uses ATMega328 specific regiter. The other Arduino board may not work|
-|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)<br>Rev.A design has bugs. Rev.B and beyond are basically comatible and has same function.<br>KiCAD用のPCBの設計データも提供されています(./kicad/*)<br>Rev.Aにはバグがあります。Rev.B以降は基本的に同じ機能です|
+|Floppy disk shield for Arduino|Design data is included. Both schematics and PCB data are available (`./kicad/*`)<br>Rev.A design has bugs. Rev.B and beyond are basically comatible and has same function.<br>KiCAD用のPCBの設計データも提供されています(./kicad/*)<br>Rev.A and Rev.Fにはバグがあります。Rev.B以降は基本的に同じ機能です|
 |Floppy disk drive|2D/2DD/2HD FDD. 3.5" or 5.25" FDD (+ power supply and ribbon cable). 300rpm drive is recommended but 360rpm 2HD drive will work as a 2DD drive. The FD-shield can detect the track density (2D or 2DD/2HD, 80 tracks or 160 tracks) and spindle spin speed (300rpm or 360rpm)|  
 
 **Software**  
@@ -32,16 +32,15 @@ The system consists of the hardware and software:
 |Name|Description|
 |:--------|:-----------|
 |`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
-|`transfer.py`|Transfers raw bitstream data from Arduino to PC|
-|`fdcapture.ino`|Arduino firmware for controlling floppy disk shield|
-|`bs2d77.py`|Bit-stream data to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod is backward compatible with the standard D77 disk images. You can use the D77mod image with emulators which supports D77/D88 image data.|
+|`transfer.py`|Transfers raw bitstream data from Arduino to a PC|
+|`bs2d77.py`|Bit-stream data to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod uses some reserved bytes in the header but it is designed to keep backward compatibility with the standard D77 disk images. The D77mod image should work with emulators which supports regular D77/D88 disk images.|
 |`bs_inspect.py`|Data inspection/analyze tool for bit-stream data|
 |`d77_inspect.py`|Data inspection/analyze tool for D77/D88 disk image data|
 |`floppylib.py`|A library which provides fundamental floppy disk functions.<br> This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
-|`d77dec.py`|Convert D77/D88 disk image data to JSON (plane text) data|
-|`d77enc.py`|Generate D77/D88 disk image data from JSON data|
+|`d77dec.py`|Convert a D77/D88 disk image data to a JSON (plane text) file|
+|`d77enc.py`|Generate a D77/D88 disk image data from a JSON file|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
-|`kfx2bs.py`|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and convert it|
+|`kfx2bs.py`|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and use it.|
 ### System Diagram
 ![system_diagram](resources/fd-shield.jpg)
 
@@ -64,15 +63,29 @@ Use `fdcapture.ino`
 - Insert a 2D floppy disk to the floppy disk drive (FDD) -- 2DD floppy disk can be read but it requires a simple code modification to change head seek method on `fdcapture.ino`.
 - Run following command on the Windows PC:
 ```sh
-python transfer.py -o image_name.raw
+python transfer.py -o image_name.raw --read_overlap 5
 ```
 - `transfer.py` will search COM port for Arduino UNO and use it.
+- `--read_overlap` option specifies how much data to read on the 2nd lap in percent.
 5. Convert raw bit-stream data into emulator image data (D77mod) -- ビットストリームからディスクイメージファイルを生成
 ```sh
 python bs2d77.py -i image_name.raw --abort_id
 ```
 - `image_name.d77` will be generated.  
 **Note:** The `--abort_id` option enables abort reading track image when the same sector ID is detected. The FD-shield can read the top of the 2nd lap with `--read_overlap` option. This overlapped track data may contain the same sector data twice. This option will prevent from generating the same sector in a track.  
+
+## Current Development Status
+**Done:**
+- Read floppy disk images (2D disk on 2D drive, 2DD disk on 2D deive, 2D disk on 2DD/2HD drive)
+- Drive type auto datection (2D or 2DD/2HD)
+- Drive spindle revolution measurement 
+- Generates D77mod disk images from the raw bitstream data
+
+**WIP**
+- Bug fix
+
+**Known Issues**
+- The last data bit in CRC field may be lost. This may cause a ID or Data CRC error.
 
 ## Test Environment
 
