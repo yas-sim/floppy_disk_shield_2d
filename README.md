@@ -47,6 +47,10 @@ The system consists of the hardware and software:
 ## FD-Shield - How It Works
 ![FD_Shield How it works](resources/fd-shield1.jpg)
 
+![FD_Shield_Principal_of_operation](resources/fd-shield3a.jpg)
+
+![FD_Shield_Principal_of_operation](resources/fd-shield3b.jpg)
+
 ---------
 
 ## How to use - 使い方
