@@ -31,16 +31,16 @@ The system consists of the hardware and software:
 
 |Name|Description|
 |:--------|:-----------|
-|`fdcapture.ino`|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
-|`transfer.py`|Transfers raw bitstream data from Arduino to a PC|
-|`bs2d77.py`|Bit-stream data to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod uses some reserved bytes in the header but it is designed to keep backward compatibility with the standard D77 disk images. The D77mod image should work with emulators which supports regular D77/D88 disk images.|
-|`bs_inspect.py`|Data inspection/analyze tool for bit-stream data|
-|`d77_inspect.py`|Data inspection/analyze tool for D77/D88 disk image data|
+|[`fdcapture.ino`](./docs/fdcapture_ino.md)|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
+|[`transfer.py`](./docs/transfer.md)|Transfers raw bitstream data from Arduino to a PC|
+|[`bs2d77.py`](./docs/bs2d77.md)|Bit-stream data to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod uses some reserved bytes in the header but it is designed to keep backward compatibility with the standard D77 disk images. The D77mod image should work with emulators which supports regular D77/D88 disk images.|
+|[`bs_inspect.py`](./docs/bs_inspect.md)|Data inspection/analyze tool for bit-stream data|
+|[`d77_inspect.py`](./docs/d77_inspect.md)|Data inspection/analyze tool for D77/D88 disk image data|
 |`floppylib.py`|A library which provides fundamental floppy disk functions.<br> This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
 |`d77dec.py`|Convert a D77/D88 disk image data to a JSON (plane text) file|
 |`d77enc.py`|Generate a D77/D88 disk image data from a JSON file|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
-|`kfx2bs.py`|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and use it.|
+|[`kfx2bs.py`](./docs/kfx2bs.md)|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and use it.|
 ### System Diagram
 ![system_diagram](resources/fd-shield.jpg)
 
