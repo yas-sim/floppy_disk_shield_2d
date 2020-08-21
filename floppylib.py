@@ -153,7 +153,7 @@ A1: ' D   D  C * C  D'
 class data_separator:
     def __init__(self, interval_buf, clk_spd =4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
         self.interval_buf = interval_buf
-        self.pos = 0
+        self.rewind()
         self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
         missing_clock_c2 = (0x5224)  #  [0,1,0,1, 0,0,1,0, *,0,1,0, 0,1,0,0]
         missing_clock_a1 = (0x4489)  #  [0,1,0,0, 0,1,0,0, 1,0,*,0, 1,0,0,1]
@@ -162,6 +162,13 @@ class data_separator:
         self.missing_clock = [ missing_clock_c2, missing_clock_a1 ]
         #self.sync_pattern  = [ pattern_ff, pattern_00 ]
         self.sync_pattern  = [ pattern_00 ]
+
+    def rewind(self):
+        '''
+        Rewind the read pointer of the bit stream
+        '''
+        self.pos  = 0
+        self.time = 0       # real time value at the current read pointer (ns)
 
     def set_gain(self, high_gain, low_gain):
         self.high_gain = high_gain
@@ -182,24 +189,26 @@ class data_separator:
         self.mode = mode
 
     def reset(self, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
-        self.clock_speed   = clk_spd
-        self.spin_speed    = spin_spd                 # ms/spin
-        self.bit_cell      = 500e3                    # 1/2MHz
-        self.cell_size     = (self.clock_speed*(spin_spd/0.2)) / self.bit_cell
-        self.cell_size_ref = self.cell_size
-        self.cell_size_max = self.cell_size * 1.1
-        self.cell_size_min = self.cell_size * 0.9
-        self.bit_stream    = []
+        self.clock_speed    = clk_spd
+        self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns]
+        self.spin_speed     = spin_spd                 # ms/spin
+        self.bit_cell       = 500e3                    # 1/2MHz
+        self.cell_size      = (self.clock_speed*(spin_spd/0.2)) / self.bit_cell
+        self.cell_size_ref  = self.cell_size
+        self.cell_size_max  = self.cell_size * 1.1
+        self.cell_size_min  = self.cell_size * 0.9
+        self.bit_stream     = []
         self.set_gain(high_gain=high_gain, low_gain=low_gain)
         self.switch_gain(0)         # low speed gain
         self.set_mode(0)            # 0: AM seeking, 1: Data reading (ignore SYNC and missing clock patterns)
-        self.cd_stream     = 0      # C+D bitstream for missing clock and SYNC pattern detection
+        self.cd_stream      = 0      # C+D bitstream for missing clock and SYNC pattern detection
 
     def get_interval(self):
         if self.pos >= len(self.interval_buf):
             return -1
         dt = self.interval_buf[self.pos]
-        self.pos+=1
+        self.pos  += 1
+        self.time += dt * self.clock_cycle_ns
         return dt
 
     def get_quantized_interval(self):
@@ -224,12 +233,26 @@ class data_separator:
         self.cell_size = min(self.cell_size, self.cell_size_max)
         return quant_interval, interval
 
+    def calc_time_from_pos(self, pos):
+        tm = 0
+        if pos<len(self.interval_buf) and pos>0:
+            for i in range(pos):
+                tm += self.interval_buf[i] * self.clock_cycle_ns
+        return tm
+
+    def get_time_ns(self):
+        return self.time
+
+    def get_time_ms(self):
+        return self.time / 1e6
+
     def get_pos(self):
         return self.pos
 
     def set_pos(self, pos):
         if pos<len(self.interval_buf) and pos>0:
-            self.pos = pos
+            self.pos  = pos
+            self.time = self.calc_time_from_pos(pos) 
 
     def get_bit(self):  # Does VFO tracking
         while True:
@@ -423,9 +446,10 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
-                if id_field[1:-2] in id_lists and abort_by_sameid:     # abort when the identical ID is detected
-                    if log_level>0: print('Abort by 2nd identical ID detection')
-                    break
+                if ds.get_time_ms() > 200:    # same_id_abort will be enabled only after 200ms passed
+                    if id_field[1:-2] in id_lists and abort_by_sameid:     # abort when the identical ID is detected
+                        if log_level>0: print('Abort by 2nd identical ID detection')
+                        break
                 id_lists.append(id_field[1:-2])   # remove DataAM and CRC
                 if crc.get()==0:
                     id_buf.append(id_field[1:] + [True, id_ds_pos, id_mfm_pos])  #id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
