@@ -352,6 +352,24 @@ def read_track(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=
     return mfm_buf, mc_buf
 
 
+#"""
+# MB8877
+# Fujitsu MB8877 FDC accepts several pattern of address mark bytes
+DELETED_DATA_ADDRESS_MARKS = [ 0xf8, 0xf9 ]
+DATA_ADDRESS_MARKS         = [ 0xfa, 0xfb ]
+ID_ADDRESS_MARKS           = [ 0xfc, 0xfd, 0xfe, 0xff ]
+INDEX_ADDRESS_MARKS        = [ 0xfc ]
+SECTOR_LENGTH_LIST         = [ 128, 256, 512, 1024 ]
+#"""
+"""
+# uPD765A
+# Address marks for standard IBM format
+DELETED_DATA_ADDRESS_MARKS = [ 0xf8 ]
+DATA_ADDRESS_MARKS         = [ 0xfb ]
+ID_ADDRESS_MARKS           = [ 0xfe ]
+INDEX_ADDRESS_MARKS        = [ 0xfc ]
+SECTOR_LENGTH_LIST         = [ 128, 256, 512, 1024, 2048, 4096 ]
+"""
 
 def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0, abort_by_idxmark=True, abort_by_sameid=True):
     """
@@ -422,15 +440,14 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
             if mc == True:                  # Skip missing clock data
                 mc_byte = data
                 continue
-            # C2 C2 C2 FC is an Index mark but A1 A1 A1 FC can be used as ID mark (a bug in FDC?)
-            elif data == 0xfe or (mc_byte == 0xa1 and data == 0xfc): # ID AM
+            elif mc_byte == 0xa1 and data in ID_ADDRESS_MARKS: # ID AM
                 if log_level>0: print('IDAM ', end='')
                 id_field = [ data ]
                 read_count = 4+2   # ID+CRC
                 id_ds_pos  = ds.get_pos()   # ID position in the interval buffer
                 id_mfm_pos = mfm_count-1
                 state = State.IDAM
-            elif mc_byte == 0xc2 and data == 0xfc:
+            elif mc_byte == 0xc2 and data in INDEX_ADDRESS_MARKS:
                 if log_level>0: print('IDX_MARK')
                 idx_count += 1
                 if ds.get_time_ms() > spin_spd*1000:    # index_abort will be enabled from the 2nd lap
@@ -461,7 +478,6 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
                     if log_level>1: dump_list_hex(id_field)
                 state = State.IDLE
     return id_buf
-
 
 
 def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01, log_level=0):
@@ -525,24 +541,23 @@ def read_sector(interval_buf, sect_num, ds_pos=0, clk_spd=4e6, spin_spd=0.2, hig
             if mc == True:                  # Skip missing clock data
                 mc_byte = data
                 continue
-            # C2 C2 C2 FC is an Index mark but A1 A1 A1 FC can be used as ID mark (a bug in FDC?)
-            elif data == 0xfe or (mc_byte == 0xa1 and data == 0xfc): # ID AM
+            elif mc_byte == 0xa1 and (data in ID_ADDRESS_MARKS): # ID AM
                 if log_level>0: print('IDAM ', end='')
                 id_field = [ data ]
                 read_count = 4+2   # ID+CRC
                 state = State.IDAM
-            elif mc_byte == 0xc2 and data == 0xfc:  # Index AM
+            elif mc_byte == 0xc2 and data in INDEX_ADDRESS_MARKS:  # Index AM
                 state = State.INDEX
-            elif data == 0xfb or data == 0xf8:      # DataAM or DeletedDataAM
+            elif data in DATA_ADDRESS_MARKS or data in DELETED_DATA_ADDRESS_MARKS:      # DataAM or DeletedDataAM
                 if len(id_field) < 4:
                     state = State.IDLE
                 elif id_field[2] == sect_num:       # check sector # match
                     if log_level>0:
-                        if data == 0xfb: print('DAM ', end='')
-                        else:            print('DDAM', end='')
+                        if data in DATA_ADDRESS_MARKS: print('DAM ', end='')
+                        else:                          print('DDAM', end='')
                     sector = [ data ]
                     address_mark = True if data==0xfb else False  # DAM=True, DDAM=False
-                    read_count = [128, 256, 512, 1024][id_field[3] & 0x03]
+                    read_count = SECTOR_LENGTH_LIST[id_field[3] % len(SECTOR_LENGTH_LIST)]
                     read_count += 2   # for CRC
                     state = State.DATA_READ
                 else:

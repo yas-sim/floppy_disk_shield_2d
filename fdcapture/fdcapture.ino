@@ -79,14 +79,21 @@ class FDD {
     }
 
     inline void step1(void) {
+#if 0
+        digitalWrite(FD_STEP, LOW);
+        delay(STEP_RATE/2);
+        digitalWrite(FD_STEP, HIGH);
+        delay(STEP_RATE/2);
+#else
         digitalWrite(FD_STEP, LOW);
         delayMicroseconds(1);
         digitalWrite(FD_STEP, HIGH);
         delay(STEP_RATE);
+#endif
     }
 
     void step(void) {
-      int iter = (media_type == ENUM_DRV_MODE::mode_2d) ? 1 : 2;
+      int iter = (drive_type == ENUM_DRV_MODE::mode_2d) ? 1 : 2;
       for (int i = 0; i < iter; i++) {
         step1();
       }
@@ -166,16 +173,16 @@ class FDD {
     }
 
     void detect_drive_type(void) {
-      set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
+      set_drive_type(ENUM_DRV_MODE::mode_2d);
       track00();
       seek(0,44);
       seek(43,0);
       Serial.print(F("**DRIVE_TYPE "));
       if(readTRK00()==LOW) {
-        set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
+        set_drive_type(ENUM_DRV_MODE::mode_2d);
         Serial.println(F("2D"));
       } else {
-        set_drive_type(FDD::ENUM_DRV_MODE::mode_2dd);
+        set_drive_type(ENUM_DRV_MODE::mode_2dd);
         Serial.println(F("2DD"));
       }
     }
@@ -609,6 +616,8 @@ void loop() {
   cmd = toupper(cmdBuf[1]);
 
   if(cmd == 'R') {
+    FDD.head(true);
+    FDD.motor(true);
     enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
     int start_track, end_track;
     int read_overlap;   // track read overlap (%)

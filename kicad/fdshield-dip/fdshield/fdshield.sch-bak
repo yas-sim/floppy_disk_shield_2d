@@ -1396,7 +1396,7 @@ Wire Wire Line
 Text Notes 7650 6900 0    98   ~ 0
 2D/2DD FLOPPY DISK CAPTURE SHIELD
 Text Notes 10600 7650 0    79   ~ 0
-F
+G
 Wire Wire Line
 	1850 6800 2200 6800
 Connection ~ 1850 6800
