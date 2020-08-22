@@ -24,7 +24,11 @@ def main(args):
         sys.exit(1)
     else:
         print('Arduino is found on "{}"'.format(arduino_port))
-    uart = serial.Serial(arduino_port, baudrate=115200, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+    try:
+        uart = serial.Serial(arduino_port, baudrate=115200, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+    except serial.serialutil.SerialException:
+        print('ERROR : ' + arduino_port + ' is in use.')
+        sys.exit(1)
 
     # generate output file name
     if args.output is None:

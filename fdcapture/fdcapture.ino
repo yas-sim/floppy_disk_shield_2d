@@ -168,8 +168,8 @@ class FDD {
     void detect_drive_type(void) {
       set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
       track00();
-      seek(0,43);
-      seek(42,0);
+      seek(0,44);
+      seek(43,0);
       Serial.print(F("**DRIVE_TYPE "));
       if(readTRK00()==LOW) {
         set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);

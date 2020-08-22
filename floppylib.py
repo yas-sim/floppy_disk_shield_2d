@@ -190,7 +190,7 @@ class data_separator:
 
     def reset(self, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
         self.clock_speed    = clk_spd
-        self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns]
+        self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns] 4MHz == 250ns
         self.spin_speed     = spin_spd                 # ms/spin
         self.bit_cell       = 500e3                    # 1/2MHz
         self.cell_size      = (self.clock_speed*(spin_spd/0.2)) / self.bit_cell
@@ -262,11 +262,11 @@ class data_separator:
             quant_interval, interval = self.get_quantized_interval()
             if quant_interval == -1:
                 return -1
-            if   quant_interval <= 2:
+            if   quant_interval == 2:
                 self.bit_stream +=       [0, 1]
             elif quant_interval == 3:
                 self.bit_stream +=    [0, 0, 1]
-            elif quant_interval >= 4:
+            elif quant_interval == 4:
                 self.bit_stream += [0, 0, 0, 1]
 
     def get_bit_2(self):  # No VFO tracking version
@@ -431,10 +431,9 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
                 id_mfm_pos = mfm_count-1
                 state = State.IDAM
             elif mc_byte == 0xc2 and data == 0xfc:
-                print('IDX_MARK')
                 if log_level>0: print('IDX_MARK')
                 idx_count += 1
-                if ds.get_time_ms() > spin_spd:    # index_abort will be enabled from the 2nd lap
+                if ds.get_time_ms() > spin_spd*1000:    # index_abort will be enabled from the 2nd lap
                     if idx_count > 1 and abort_by_idxmark:
                         if log_level>0: print('2nd index mark is detected - read aborted')
                         break
@@ -447,7 +446,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
-                if ds.get_time_ms() > spin_spd:    # same_id_abort will be enabled from the 2nd lap
+                if ds.get_time_ms() > spin_spd*1000:    # same_id_abort will be enabled from the 2nd lap
                     if id_field[1:-2] in id_lists and abort_by_sameid:     # abort when the identical ID is detected
                         if log_level>0: print('Abort by 2nd identical ID detection')
                         break
