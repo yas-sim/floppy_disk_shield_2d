@@ -46,14 +46,15 @@ def main(args):
                 uart.write('+R {} {} {} {}\n'.format(args.start_track, args.end_track, media_type, args.read_overlap).encode('ascii'))
                 f.write('**TRACK_RANGE {} {}\n'.format(args.start_track, args.end_track))
                 f.write('**MEDIA_TYPE {}\n'.format(args.media_type))
-                f.write('**OVERLAP {}\n'.format(args.read_overlap))
-            if line[:2] == '**':
+            if line[:2] == '**' or line[:2] == '##':
                 print('\n' + line)
             if line[:7] == '**START':
                 active_flag = True
             if line[:12] == '**COMPLETED':
                 exit_flag = True
             if active_flag:
+                if line[:2] == '##':
+                    continue
                 f.write(line+'\n')
                 if line[0] == '~':
                     print('.', flush=True, end='')

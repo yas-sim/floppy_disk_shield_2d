@@ -235,9 +235,8 @@ class FDCapture {
 
 
 class SPISRAM {
-  private:
-    const unsigned long SPI_CLK = 4e6;
   public:
+    const unsigned long SPI_CLK = 4e6;
     const unsigned long SPISRAM_CAPACITY = 2 * 65535UL; // 1Mbit SRAM
 
     SPISRAM() { }
@@ -611,8 +610,8 @@ void loop() {
 
   if(cmd == 'R') {
     enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
-    int start_track = 0, end_track = 79;
-    int read_overlap = 20;   // track read overlap (%)
+    int start_track, end_track;
+    int read_overlap;   // track read overlap (%)
     sscanf(cmdBuf, "+%c %d %d %d %d", &cmd, &start_track, &end_track, &media_mode, &read_overlap);
     Serial.println(F("**START"));
 
@@ -630,6 +629,17 @@ void loop() {
     Serial.print(F("**SPIN_SPD "));
     Serial.println(spin,8);
     g_spin_ms = (int)(spin*1000);
+
+    int max_capture_time_ms = (int)(((SPISRAM.SPISRAM_CAPACITY*8.f) / SPISRAM.SPI_CLK)*1000.f);
+    int capture_time_ms     = (int)(g_spin_ms * (1.f + read_overlap/100.f));
+    if(capture_time_ms > max_capture_time_ms) {
+      read_overlap = (int)((((float)max_capture_time_ms / (float)g_spin_ms) - 1.f) * 100.f);
+      Serial.print(F("##READ_OVERLAP IS LIMITED TO "));
+      Serial.print(read_overlap);
+      Serial.println(F("% BECAUSE THE AMOUNT OF CAPTURE DATA EXCEEDS THE MAX SPI-SRAM CAPACITY."));
+    }
+    Serial.print(F("**OVERLAP "));
+    Serial.println(read_overlap);
 
     // Read all tracks
     read_tracks(start_track, end_track, read_overlap);

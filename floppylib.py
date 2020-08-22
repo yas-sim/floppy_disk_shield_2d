@@ -434,9 +434,10 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
                 print('IDX_MARK')
                 if log_level>0: print('IDX_MARK')
                 idx_count += 1
-                if idx_count > 1 and abort_by_idxmark:
-                    if log_level>0: print('2nd index mark is detected - read aborted')
-                    break
+                if ds.get_time_ms() > spin_spd:    # index_abort will be enabled from the 2nd lap
+                    if idx_count > 1 and abort_by_idxmark:
+                        if log_level>0: print('2nd index mark is detected - read aborted')
+                        break
             else:
                 state = State.IDLE
 
@@ -446,7 +447,7 @@ def search_all_idam(interval_buf, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_
             if read_count == 0:
                 crc.reset()
                 crc.data(id_field)
-                if ds.get_time_ms() > 200:    # same_id_abort will be enabled only after 200ms passed
+                if ds.get_time_ms() > spin_spd:    # same_id_abort will be enabled from the 2nd lap
                     if id_field[1:-2] in id_lists and abort_by_sameid:     # abort when the identical ID is detected
                         if log_level>0: print('Abort by 2nd identical ID detection')
                         break
