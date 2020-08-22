@@ -80,9 +80,9 @@ class FDD {
 
     inline void step1(void) {
         digitalWrite(FD_STEP, LOW);
-        delay(STEP_RATE/2);
+        delayMicroseconds(1);
         digitalWrite(FD_STEP, HIGH);
-        delay(STEP_RATE/2);
+        delay(STEP_RATE);
     }
 
     void step(void) {
@@ -111,7 +111,9 @@ class FDD {
 
     void stepOut(void) {  // Step towards outer track (trk#--)
       setStepDir(HIGH);
-      step();
+      if(readTRK00()==HIGH) {
+        step();
+      }
     }
 
     void track00(void) {
@@ -166,7 +168,7 @@ class FDD {
     void detect_drive_type(void) {
       set_drive_type(FDD::ENUM_DRV_MODE::mode_2d);
       track00();
-      seek(0,44);
+      seek(0,43);
       seek(42,0);
       Serial.print(F("**DRIVE_TYPE "));
       if(readTRK00()==LOW) {
