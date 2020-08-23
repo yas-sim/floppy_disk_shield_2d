@@ -7,7 +7,11 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from floppylib import *
+from floppylib.bitstream import bitstream
+from floppylib.dataseparator import data_separator
+from floppylib.formatparserIBM import FormatParserIBM
+from floppylib.d77image import d77_image
+
 
 def pause():
     while True:
@@ -18,6 +22,7 @@ def pause():
             sys.exit(0)
 
 
+# MFM decoder for bitstream visualizer
 class decode_MFM:
     def __init__(self):
         self.data           = 0
@@ -67,6 +72,7 @@ class decode_MFM:
                 self.read_bit_count = 0
                 return data, False       # 8 bit data read completed
 
+# Visualize bitstream timing
 def timing_history(interval_buf, spin_spd, args):
     val_max = 64
     ystep=1
@@ -108,8 +114,7 @@ def timing_history(interval_buf, spin_spd, args):
 
 
 def histogram(interval_buf):
-    #fig = plt.figure(figsize=(8,4), dpi=200)
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8,4), dpi=200)
     ax1 = fig.add_subplot(1,2,1)
     ax2 = fig.add_subplot(1,2,2)
 
@@ -118,26 +123,27 @@ def histogram(interval_buf):
     ax1.set_ylabel('frequency')
     ax1.set_xlim(0,80)
     ax1.grid(True)
-    ax1.hist(interval_buf, bins=100, range=(0,100), histtype='stepfilled', orientation='vertical', log=False)
+    ax1.hist(interval_buf, bins=80, range=(0,80), histtype='stepfilled', orientation='vertical', log=False)
 
     ax2.set_title('log-scale')
     ax2.set_xlabel('count')
     ax2.set_ylabel('frequency')
     ax2.set_xlim(0,80)
     ax2.grid(True)
-    ax2.hist(interval_buf, bins=100, range=(0,100), histtype='stepfilled', orientation='vertical', log=True)
+    ax2.hist(interval_buf, bins=80, range=(0,80), histtype='stepfilled', orientation='vertical', log=True)
 
     plt.show()
 
 def mfm_dump(interval, spin_spd, args):
-    mfm_buf, mc_buf = read_track(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    mfm_buf, mc_buf = parser.read_track()
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
-    dumpMFM(mfm_buf, mc_buf)
+    parser.dumpMFM(mfm_buf, mc_buf)
 
 #   id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]  
 def id_dump(interval, spin_spd, args):
-    id_buf = search_all_idam(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
-                    abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
+    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    id_buf = parser.search_all_idam(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     print(' # : (C ,H ,R ,N ) ID-CRC CRC-val')
     for i, idam in enumerate(id_buf):
         print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {}    0x{:04x}'.format(i+1, idam[0], idam[1], idam[2], idam[3], 'OK ' if idam[6] else 'ERR', (idam[4]<<8)+idam[5]))
@@ -148,11 +154,11 @@ def generate_key(track):
     key = '{}-{}'.format(trk, sid)
     return key
 
-def read_sectors(interval_buf, spin_spd, args):
+def read_sectors(interval, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
-                        abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
+    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    track, sec_read, sec_err = parser.read_all_sectors(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
     for i, sect in enumerate(track):
         idam = sect[0]
@@ -164,11 +170,11 @@ def read_sectors(interval_buf, spin_spd, args):
             idam[8]))
     print('OK={}, Error={}'.format(sec_read, sec_err))
 
-def ascii_dump(interval_buf, spin_spd, args):
+def ascii_dump(interval, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-    track, sec_read, sec_err = read_all_sectors(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level,
-                    abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
+    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    track, sec_read, sec_err = parser.read_all_sectors(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     for i, sect in enumerate(track):
         idam = sect[0]
         print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')

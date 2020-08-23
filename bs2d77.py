@@ -2,7 +2,9 @@ import os
 import sys
 import argparse
 
-from floppylib import *
+from floppylib.bitstream import bitstream
+from floppylib.formatparserIBM import FormatParserIBM
+from floppylib.d77image import d77_image
 
 def main(args):
     if args.output is None:
@@ -27,33 +29,21 @@ def main(args):
 
     count = 0
     # Find all IDs and read sectors for all tracks
+    parser = FormatParserIBM(None, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     for track_id in bs.disk:
         ttl_trk += 1
         track_data = bs.disk[track_id]     # pulse interval buffer
+        parser.set_interval_buf(track_data)
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
         #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-        track, sec_read, sec_err = read_all_sectors(
-                    track_data, 
-                    clk_spd=args.clk_spd, 
-                    spin_spd=spin_speed, 
-                    high_gain=args.high_gain, 
-                    low_gain=args.low_gain, 
-                    log_level=args.log_level,
-                    abort_by_idxmark=args.abort_index, 
-                    abort_by_sameid=args.abort_id)
+        track, sec_read, sec_err = parser.read_all_sectors(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
         ttl_read += sec_read
         ttl_err  += sec_err
 
         disk.append(track)
         
-        mfm_buf, mc_buf = read_track(
-                    track_data, 
-                    clk_spd=args.clk_spd, 
-                    spin_spd=spin_speed, 
-                    high_gain=args.high_gain, 
-                    low_gain=args.low_gain, 
-                    log_level=args.log_level)
+        mfm_buf, mc_buf = parser.read_track()
         mfm.append(mfm_buf)
         mc.append(mc_buf)
 
