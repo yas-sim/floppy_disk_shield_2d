@@ -51,6 +51,28 @@ The system consists of the hardware and software:
 
 ![FD_Shield_Principal_of_operation](resources/fd-shield3b.jpg)
 
+
+---------
+
+## Introduction of Features in the Support Tools
+
+* `bs_inspect.py`  
+This tool provides featurs to analyze or check the bitstream data and its quality.  
+  * Visualize data timing history
+  * Visualize data timing histogram
+  * Read all IDs in the tracks
+  * Read all sectors in the tracks
+  * MFM data dump
+  * ASCII data dump (display pritable/readable data)
+  * Tweak parameters (VFO high/low gain value, sampling frequency, FDD spin speed) 
+
+### Bitstream visualizer
+![history-good](resources/history-good.png)
+![history-bad](resources/history-bad.png)
+### Bitstream timing histogram viewer
+* Good case ![histogram-good](resources/histogram-good.png)
+* Bad case - The quality of data is bad. This might be caused by FDD quality (both writing drive and reading drive) and floppy disk media aging (magnetic flux power fading, contamination, etc).![histogram-bad](resources/histogram-bad.png)
+
 ---------
 
 ## How to use - 使い方
