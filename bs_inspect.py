@@ -110,7 +110,8 @@ def timing_history(interval_buf, spin_spd, args):
                 #img[-1, int(j *    8 * xstep), :] = [ 0, 255, 255 ]    # standard cell position line
             for j in range(1,4+1):
                 img[-1, int((j+0.5) * cell * xstep), :] = [ 255, 0, 0 ] # cell limit line
-        img[-1, interval * xstep, : ] = [ 255, 255, 255]                # data point
+        dataPos = min(interval * xstep, img.shape[1]-1)
+        img[-1, dataPos, : ] = [ 255, 255, 255]                # data point
 
 
 def histogram(interval_buf):
@@ -138,7 +139,7 @@ def mfm_dump(interval, spin_spd, args):
     parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     mfm_buf, mc_buf = parser.read_track()
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
-    parser.dumpMFM(mfm_buf, mc_buf)
+    parser.dumpMFM16(mfm_buf, mc_buf)
 
 #   id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]  
 def id_dump(interval, spin_spd, args):

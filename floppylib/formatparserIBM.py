@@ -60,8 +60,33 @@ class FormatParserIBM:
             count+=1
             if count==32:
                 count=0
-                print('')
-        print('')
+                print()
+        print()
+
+    def dumpMFM16(self, mfm_buf, mc_buf=None):
+        def dumpAscii(asciiString):
+            print('    '*(16-len(asciiString)), end='')
+            print(' : ', end='')
+            print(asciiString)
+        count = 0
+        asciiString=''
+        for mfm in mfm_buf:
+            if mc_buf is not None:
+                mc = mc_buf.pop(0)
+                if mc==True:
+                    print(' *', end='')
+                else:
+                    print('  ', end='')
+            else:
+                print(' ', end='')
+            print(format(mfm, '02X'), end='')
+            asciiString += chr(mfm) if mfm>=0x20 and mfm<=0x7e else '.'
+            count+=1
+            if count==16:
+                dumpAscii(asciiString)
+                asciiString = ''
+                count=0
+        dumpAscii(asciiString)
 
 
     def read_track(self):
