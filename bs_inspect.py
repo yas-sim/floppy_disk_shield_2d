@@ -93,7 +93,8 @@ def timing_history(interval_buf, spin_spd, args):
         count+=1
         mfm, mc = mfm_decoder.decode(quant_interval, ds)
         if mfm != -1:
-            cv2.putText(img, format(mfm, '02x'), (10, height), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+            color = (255,255,255) if mc==False else (0,255,255)
+            cv2.putText(img, format(mfm, '02x'), (10, height), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
         if count % 1==0:
             cell = ds.cell_size
             writer.write(img)
