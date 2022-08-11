@@ -7,8 +7,8 @@ from floppylib.crc import CCITT_CRC
 from floppylib.dataseparator import data_separator
 
 class FormatParserIBM:
-    def __init__(self, interval_buf, clk_spd = 4e6, spin_spd = 0.2, high_gain = 0, low_gain = 0, log_level = 0):
-        self.interval_buf = interval_buf
+    def __init__(self, bit_stream, clk_spd = 4e6, spin_spd = 0.2, high_gain = 0, low_gain = 0, log_level = 0):
+        self.bit_stream   = bit_stream
         self.clk_spd      = clk_spd
         self.spin_spd     = spin_spd
         self.high_gain    = high_gain
@@ -36,8 +36,8 @@ class FormatParserIBM:
     def set_log_level(self, log_level = 0):
         self.log_level = log_level
 
-    def set_interval_buf(self, interval_buf):
-        self.interval_buf = interval_buf
+    def set_bit_stream(self, bit_stream):
+        self.bit_stream = bit_stream
 
     def dump_list_hex(self, lst):
         print('[ ', end='')
@@ -98,7 +98,7 @@ class FormatParserIBM:
         mfm_buf = []
         mc_buf  = []
 
-        ds = data_separator(self.interval_buf, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
+        ds = data_separator(self.bit_stream, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
         ds.set_mode(0)      # AM seeking
 
         while True:
@@ -132,7 +132,7 @@ class FormatParserIBM:
             DDAM       = 5
             DATA_READ  = 6
         
-        ds = data_separator(self.interval_buf, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
+        ds = data_separator(self.bit_stream, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
         ds.set_mode(0)      # AM seeking
         ds.set_pos(0)
 
@@ -239,11 +239,11 @@ class FormatParserIBM:
         id_field = []
         sector = []
 
-        ds = data_separator(self.interval_buf, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
+        ds = data_separator(self.bit_stream, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
         ds.set_mode(0)      # AM seeking
 
-        ds_pos = max(0, ds_pos - (16*16))   # Rewind the sector read start position a bit
-        ds.set_pos(ds_pos)                  # sector search start position
+        #ds_pos = max(0, ds_pos - (16*16))   # Rewind the sector read start position a bit
+        #ds.set_pos(ds_pos)                  # sector search start position
 
         crc = CCITT_CRC()
 
@@ -310,7 +310,7 @@ class FormatParserIBM:
                     else:
                         if self.log_level>0: print("CRC - ERROR")
                         if self.log_level>1: self.dump_list_hex(id_)
-                        ds.reset()
+                        #ds.reset()
                     state = State.IDLE
 
             # Read sector data for DAM and DDAM

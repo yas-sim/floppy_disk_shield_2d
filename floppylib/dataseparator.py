@@ -16,10 +16,10 @@ A1: ' D   D  C * C  D'
 """
 
 class data_separator:
-    def __init__(self, interval_buf, clk_spd =4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
-        self.interval_buf = interval_buf
+    def __init__(self, bit_stream, clk_spd =4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
         self.rewind()
         self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
+        self.bit_stream = bit_stream
         missing_clock_c2 = (0x5224)  #  [0,1,0,1, 0,0,1,0, *,0,1,0, 0,1,0,0]
         missing_clock_a1 = (0x4489)  #  [0,1,0,0, 0,1,0,0, 1,0,*,0, 1,0,0,1]
         pattern_ff       = (0x5555555555555555)  # for 4 bytes of sync data (unused)
@@ -32,7 +32,7 @@ class data_separator:
         '''
         Rewind the read pointer of the bit stream
         '''
-        self.pos  = 0
+        self.cell_pos  = 0
         self.time = 0       # real time value at the current read pointer (ns)
 
     def set_gain(self, high_gain, low_gain):
@@ -58,52 +58,23 @@ class data_separator:
         self.clock_speed    = clk_spd
         self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns] 4MHz == 250ns
         self.spin_speed     = spin_spd                 # ms/spin
-        self.bit_cell       = 500e3                    # 1/2MHz
-        self.cell_size      = (self.clock_speed*(spin_spd/0.2)) / self.bit_cell
-        self.cell_size_ref  = self.cell_size
-        self.cell_size_max  = self.cell_size * 1.1
-        self.cell_size_min  = self.cell_size * 0.9
+        self.bit_rate       = 500e3                    # 500HKz
+        self.cell_size_ref  = self.clock_speed / self.bit_rate
+        self.set_cell_size(self.cell_size_ref)
         self.bit_stream     = []
         self.set_gain(high_gain=high_gain, low_gain=low_gain)
         self.switch_gain(0)         # low speed gain
         self.set_mode(0)            # 0: AM seeking, 1: Data reading (ignore SYNC and missing clock patterns)
         self.cd_stream      = 0      # C+D bitstream for missing clock and SYNC pattern detection
-
-    def get_interval(self):
-        if self.pos >= len(self.interval_buf):
-            return -1
-        dt = self.interval_buf[self.pos]
-        self.pos  += 1
-        self.time += dt * self.clock_cycle_ns
-        return dt
-
-    def get_quantized_interval(self):
-        """
-        Get pulse interval value and do VFO tracking
-        """
-        interval = self.get_interval()   # interval = pulse interval in 'cell_size' unit (cell_size=2us in case of 2D/2DD)
-        if interval == -1:
-            return -1, -1
-
-        quant_interval = int(interval / self.cell_size + 0.5)
-        # Track rotatioin speed fluctuation
-        try:
-            error = interval / quant_interval - self.cell_size
-        except ZeroDivisionError:
-            pass
-        else:
-            self.cell_size += error * self.gain             # Adjust the cell_size
-
-        # cell size range limitter
-        self.cell_size = max(self.cell_size, self.cell_size_min)
-        self.cell_size = min(self.cell_size, self.cell_size_max)
-        return quant_interval, interval
+        self.distance_to_next_pulse = 0
+        self.cell_pos = 0
+        self.prev_cell_pos = 0
 
     def calc_time_from_pos(self, pos):
         tm = 0
-        if pos<len(self.interval_buf) and pos>0:
+        if pos<len(self.bit_stream) and pos>0:
             for i in range(pos):
-                tm += self.interval_buf[i] * self.clock_cycle_ns
+                tm += self.bit_stream[i] * self.clock_cycle_ns
         return tm
 
     def get_time_ns(self):
@@ -113,44 +84,70 @@ class data_separator:
         return self.time / 1e6
 
     def get_pos(self):
-        return self.pos
+        return self.cell_pos
 
     def set_pos(self, pos):
-        if pos<len(self.interval_buf) and pos>0:
-            self.pos  = pos
-            self.time = self.calc_time_from_pos(pos) 
+        pos = max(pos, 0)
+        pos = min(pos, len(self.bit_stream)-1)
+        self.cell_pos  = pos
+        self.time = self.calc_time_from_pos(self.cell_pos) 
 
-    def get_bit(self):  # Does VFO tracking
+    def read_stream(self):
+        val = self.bit_stream[self.cell_pos]
+        self.cell_pos += 1
+        if self.cell_pos >= len(self.bit_stream):
+            self.cell_pos = 0
+            return -1
+        return val
+
+    def distance_to_next_bit1(self):
+        distance = 0
         while True:
-            if len(self.bit_stream) > 0:
-                bit = self.bit_stream.pop(0)
-                return bit
-            quant_interval, interval = self.get_quantized_interval()
-            if quant_interval == -1:
+            bit = self.read_stream()
+            if bit == -1:
                 return -1
-            if   quant_interval == 2:
-                self.bit_stream +=       [0, 1]
-            elif quant_interval == 3:
-                self.bit_stream +=    [0, 0, 1]
-            elif quant_interval == 4:
-                self.bit_stream += [0, 0, 0, 1]
+            if bit != 0:
+                return distance
+            distance += 1
+            if distance >= len(self.bit_stream):
+                return distance
 
-    def get_bit_2(self):  # No VFO tracking version
+    def set_cell_size(self, cell_size):
+        self.cell_size = cell_size
+        self.window_size = cell_size / 2
+        self.window_ofst = cell_size / 4
+
+    # Read next 1 bit
+    def get_bit(self):
+        bit_reading = 0
+        cell_center = self.window_ofst + self.window_size / 2;
         while True:
-            if len(self.bit_stream) > 0:
-                bit = self.bit_stream.pop(0)
-                return bit
-            interval = self.get_interval()   # interval = pulse interval in 'cell_size' unit (cell_size=2us in case of 2D/2DD)
-            if interval == -1:
-                return -1
-
-            int_interval = int(interval / self.cell_size_ref + 0.5)
-            if   int_interval == 2:
-                self.bit_stream +=       [0, 1]
-            elif int_interval == 3:
-                self.bit_stream +=    [0, 0, 1]
-            elif int_interval == 4:
-                self.bit_stream += [0, 0, 0, 1]
+            if self.distance_to_next_pulse < self.cell_size:
+                if self.distance_to_next_pulse >= self.window_ofst and \
+                   self.distance_to_next_pulse <  self.window_ofst + self.window_size:
+                    bit_reading = 1
+                    self.distance_to_next_pulse = 4
+                else:
+                    pass    # irregular pulse
+                distance = self.distance_to_next_bit1()
+                if distance == -1:
+                    return -1
+                #if self.distance_to_next_pulse < cell_center:
+                #    self.distance_to_next_pulse += 1
+                #elif self.distance_to_next_pulse > cell_center:
+                #    self.distance_to_next_pulse -= 1
+                error = self.distance_to_next_pulse - cell_center
+                #self.distance_to_next_pulse -= error*0.1
+                new_cell_size = self.cell_size + error*0.2
+                new_cell_size = max(new_cell_size, self.cell_size_ref * 0.7)
+                new_cell_size = min(new_cell_size, self.cell_size_ref * 1.3)
+                self.set_cell_size(new_cell_size)
+                self.distance_to_next_pulse += distance
+            if self.distance_to_next_pulse >= self.cell_size:
+                break
+        if self.distance_to_next_pulse >= self.cell_size:
+            self.distance_to_next_pulse -= self.cell_size
+        return bit_reading
 
     # cd_data = CDCDCD... extract only D bits
     def extract_data_bits(self, cd_data):
@@ -166,7 +163,6 @@ class data_separator:
         read_bit_count = 0   # read bit count
         while True:
             bit = self.get_bit()        # with VFO tracking
-            #bit = self.get_bit_2()     # with fixed VFO
             if bit == -1:
                 return -1, False
             read_bit_count += 1

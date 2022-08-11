@@ -8,7 +8,8 @@
 
 FDD output    :  111101110111110111011101
 Captured data :  000011110000001111000011
-This data     :     4   4     6   4   4 2  => I call this as "interval data"
+linebuf       :     4   4     6   4   4 2  => so called "interval data"
+bit_stream[]     000010001000001000100010
 """
 class bitstream:
     def __init__(self, file=None):
@@ -33,9 +34,14 @@ class bitstream:
                 elif '**TRACK_END' in line:
                     if len(linebuf)==0:
                         continue
-                    interval_buf = [ ord(c)-ord(' ') for c in linebuf ]  # decode data of a track
+                    bit_stream = []
+                    # convert linebuf to bit stream
+                    for ch in linebuf:
+                        for zero in range(ord(ch)-ord(' ')-1):
+                            bit_stream.append(0)
+                        bit_stream.append(1)
                     key = '{}-{}'.format(trk, side)
-                    self.disk[key] = interval_buf
+                    self.disk[key] = bit_stream
                 elif line[0]=='~':         # the data lines must start with '~'
                     linebuf += line[1:]
 

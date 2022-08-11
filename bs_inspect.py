@@ -36,19 +36,9 @@ class decode_MFM:
         self.missing_clock = [ missing_clock_c2, missing_clock_a1 ]
         #self.sync_pattern  = [ pattern_ff, pattern_00 ]
         self.sync_pattern  = [ pattern_00 ]
-        self.bitstream     = []
 
-    def decode(self, interval, ds):
-        if interval == 2:
-            self.bitstream += [0,1]
-        if interval == 3:
-            self.bitstream += [0,0,1]
-        if interval == 4:
-            self.bitstream += [0,0,0,1]
+    def decode(self, bit, ds):
         while True:
-            if len(self.bitstream)==0:
-                return -1, False
-            bit = self.bitstream.pop(0)
             if self.read_bit_count % 2 == 1:
                 self.data = (self.data<<1) | bit   # stores only data bits (skip clock bits)
             self.read_bit_count += 1
@@ -73,7 +63,7 @@ class decode_MFM:
                 return data, False       # 8 bit data read completed
 
 # Visualize bitstream timing
-def timing_history(interval_buf, spin_spd, args):
+def timing_history(bit_stream, spin_spd, args):
     val_max = 64
     ystep=1
     xstep = 4
@@ -81,17 +71,14 @@ def timing_history(interval_buf, spin_spd, args):
     height = 600
     writer = cv2.VideoWriter('history.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (val_max*xstep, height))
 
-    ds = data_separator(interval_buf, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain)
+    ds = data_separator(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain)
     mfm_decoder = decode_MFM()
 
     count=0
     img = np.zeros((height, val_max * xstep, 3), dtype=np.uint8)
     while True:
-        quant_interval, interval = ds.get_quantized_interval()
-        if quant_interval == -1:        # end of stream
-            break
-        count+=1
-        mfm, mc = mfm_decoder.decode(quant_interval, ds)
+        bit = ds.get_bit()
+        mfm, mc = mfm_decoder.decode(bit, ds)
         if mfm != -1:
             color = (255,255,255) if mc==False else (0,255,255)
             cv2.putText(img, format(mfm, '02x'), (10, height), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
@@ -115,7 +102,16 @@ def timing_history(interval_buf, spin_spd, args):
         img[-1, dataPos, : ] = [ 255, 255, 255]                # data point
 
 
-def histogram(interval_buf):
+def histogram(bit_stream):
+    interval_buf = []
+    dist = 0
+    for bit in bit_stream:
+        if bit == 0:
+            dist += 1
+        else:
+            interval_buf.append(dist)
+            dist = 0
+
     fig = plt.figure(figsize=(8,4), dpi=200)
     ax1 = fig.add_subplot(1,2,1)
     ax2 = fig.add_subplot(1,2,2)
@@ -136,8 +132,8 @@ def histogram(interval_buf):
 
     plt.show()
 
-def mfm_dump(interval, spin_spd, args):
-    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+def mfm_dump(bit_stream, spin_spd, args):
+    parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     mfm_buf, mc_buf = parser.read_track()
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
     parser.dumpMFM16(mfm_buf, mc_buf)
@@ -172,10 +168,10 @@ def read_sectors(interval, spin_spd, args):
             idam[8]))
     print('OK={}, Error={}'.format(sec_read, sec_err))
 
-def ascii_dump(interval, spin_spd, args):
+def ascii_dump(bit_stream, spin_spd, args):
     # track = [[id_field, Data-CRC status, sect_data, DAM],...]
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
-    parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     track, sec_read, sec_err = parser.read_all_sectors(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
     for i, sect in enumerate(track):
         idam = sect[0]
@@ -207,20 +203,20 @@ def main(args):
     for track in range(start, end+1):
         print('** TRACK ', track)
         key = generate_key(track)
-        interval_buf = bs.disk[key]
+        bit_stream = bs.disk[key]
 
         if args.history:
-            timing_history(interval_buf, spin_speed, args)
+            timing_history(bit_stream, spin_speed, args)
         if args.histogram:
-            histogram(interval_buf)
+            histogram(bit_stream)
         if args.mfm_dump:
-            mfm_dump(interval_buf, spin_speed, args)
+            mfm_dump(bit_stream, spin_speed, args)
         if args.id_dump:
-            id_dump(interval_buf, spin_speed, args)
+            id_dump(bit_stream, spin_speed, args)
         if args.read_sectors:
-            read_sectors(interval_buf, spin_speed, args)
+            read_sectors(bit_stream, spin_speed, args)
         if args.ascii_dump:
-            ascii_dump(interval_buf, spin_speed, args)
+            ascii_dump(bit_stream, spin_speed, args)
 
 
 if __name__ == '__main__':
