@@ -38,68 +38,81 @@ class decode_MFM:
         self.sync_pattern  = [ pattern_00 ]
 
     def decode(self, bit, ds):
-        while True:
-            if self.read_bit_count % 2 == 1:
-                self.data = (self.data<<1) | bit   # stores only data bits (skip clock bits)
-            self.read_bit_count += 1
+        if self.read_bit_count % 2 == 1:
+            self.data = (self.data<<1) | bit   # stores only data bits (skip clock bits)
+        self.read_bit_count += 1
 
-            self.cd_stream = ((self.cd_stream<<1) | bit) & 0xffffffffffffffff
-            if self.mode == 0 and ((self.cd_stream & 0x7fff) in self.missing_clock):
-                data = self.data
-                self.data = 0
-                self.read_bit_count = 0
-                return data, True        # missing clock detected
+        self.cd_stream = ((self.cd_stream<<1) | bit) & 0xffffffffffffffff
+        if self.mode == 0 and ((self.cd_stream & 0x7fff) in self.missing_clock):
+            data = self.data
+            self.data = 0
+            self.read_bit_count = 0
+            return data, True        # missing clock detected
 
-            if self.mode == 0 and (self.cd_stream in self.sync_pattern):
-                ds.switch_gain(1)      # Fast tracking mode to get syncronized with SYNC pattern
-                self.read_bit_count &= ~1     # C/D synchronize
-            else:
-                ds.switch_gain(0)
+        if self.mode == 0 and (self.cd_stream in self.sync_pattern):
+            ds.switch_gain(1)      # Fast tracking mode to get syncronized with SYNC pattern
+            self.read_bit_count &= ~1     # C/D synchronize
+        else:
+            ds.switch_gain(0)
 
-            if self.read_bit_count >= 16:
-                data = self.data
-                self.data = 0
-                self.read_bit_count = 0
-                return data, False       # 8 bit data read completed
+        if self.read_bit_count >= 16:
+            data = self.data
+            self.data = 0
+            self.read_bit_count = 0
+            return data, False       # 8 bit data read completed
+        return -1, False             # read data incomplete
 
 # Visualize bitstream timing
 def timing_history(bit_stream, spin_spd, args):
-    val_max = 64
-    ystep=1
-    xstep = 4
+    val_max = 24
+    ystep = 1
+    xstep = 8
     cell = 8
-    height = 600
-    writer = cv2.VideoWriter('history.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (val_max*xstep, height))
+    height = 400
+    graph_x_ofst = 8
+    writer = cv2.VideoWriter('history.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 240, ((graph_x_ofst+val_max)*xstep, height))
 
     ds = data_separator(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain)
     mfm_decoder = decode_MFM()
 
     count=0
-    img = np.zeros((height, val_max * xstep, 3), dtype=np.uint8)
+    img = np.zeros((height, (graph_x_ofst+val_max) * xstep, 3), dtype=np.uint8)
+    bit_sts = 0
+    draw = 0
     while True:
-        bit = ds.get_bit()
-        mfm, mc = mfm_decoder.decode(bit, ds)
-        if mfm != -1:
-            color = (255,255,255) if mc==False else (0,255,255)
-            cv2.putText(img, format(mfm, '02x'), (10, height), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+        bit, pos, advance = ds.get_bit_ex()
+        bit_sts |= bit          # accumlate bit status in the same cell
+        if advance:
+            mfm, mc = mfm_decoder.decode(bit_sts, ds)
+            if mfm != -1:
+                color = (255,255,255) if mc==False else (0,255,255)
+                cv2.putText(img, format(mfm, '02x'), (10, height), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+            if bit_sts == 1:
+                draw = 1
+            bit_sts = 0
+
         if count % 1==0:
-            cell = ds.cell_size
-            writer.write(img)
-            cv2.imshow('history', img)
-            key = cv2.waitKey(1)
-            if key == 27:
-                break
-            if key == ord(' '):
-                pause()
-            img[:-2, :, :] = img[2:, :, :]  # scroll up
-            img[-2:, :, :] = [0,0,0]
-            for j in range(2,4+1):
-                img[-1, int(j * cell * xstep), :] = [ 0, 0, 255 ]       # current cell position line
-                #img[-1, int(j *    8 * xstep), :] = [ 0, 255, 255 ]    # standard cell position line
-            for j in range(1,4+1):
-                img[-1, int((j+0.5) * cell * xstep), :] = [ 255, 0, 0 ] # cell limit line
-        dataPos = min(interval * xstep, img.shape[1]-1)
-        img[-1, dataPos, : ] = [ 255, 255, 255]                # data point
+            cell_size = ds.cell_size
+            window_start = ds.window_ofst
+            window_end   = ds.window_ofst + ds.window_size
+            img[:-ystep, :, :] = img[ystep:, :, :]  # scroll up
+            img[-ystep:, :, :] = [0,0,0]
+            img[-1, int((graph_x_ofst               )*xstep):int((graph_x_ofst + cell_size) *xstep), :] = [0,0,255]
+            img[-1, int((graph_x_ofst + window_start)*xstep):int((graph_x_ofst + window_end)*xstep), :] = [255,0,0]
+        pos = int((graph_x_ofst + pos)*xstep)
+        dataPos = min(pos, img.shape[1]-1)
+        if draw == 1:
+            img[-1, dataPos:dataPos+xstep, : ] = [ 255, 255, 255]                # data point
+            draw = 0
+        
+        writer.write(img)
+        cv2.imshow('history', img)
+        key = cv2.waitKey(1)
+        if key == 27:
+            writer.release()
+            break
+        if key == ord(' '):
+            pause()
 
 
 def histogram(bit_stream):

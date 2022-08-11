@@ -117,37 +117,77 @@ class data_separator:
         self.window_size = cell_size / 2
         self.window_ofst = cell_size / 4
 
-    # Read next 1 bit
+    # Read next 1 bit (for actual reading)
     def get_bit(self):
         bit_reading = 0
-        cell_center = self.window_ofst + self.window_size / 2;
         while True:
             if self.distance_to_next_pulse < self.cell_size:
                 if self.distance_to_next_pulse >= self.window_ofst and \
                    self.distance_to_next_pulse <  self.window_ofst + self.window_size:
                     bit_reading = 1
-                    self.distance_to_next_pulse = 4
                 else:
                     pass    # irregular pulse
                 distance = self.distance_to_next_bit1()
                 if distance == -1:
                     return -1
-                #if self.distance_to_next_pulse < cell_center:
-                #    self.distance_to_next_pulse += 1
-                #elif self.distance_to_next_pulse > cell_center:
-                #    self.distance_to_next_pulse -= 1
+
+                cell_center = self.window_ofst + self.window_size / 2;
                 error = self.distance_to_next_pulse - cell_center
-                #self.distance_to_next_pulse -= error*0.1
-                new_cell_size = self.cell_size + error*0.2
-                new_cell_size = max(new_cell_size, self.cell_size_ref * 0.7)
-                new_cell_size = min(new_cell_size, self.cell_size_ref * 1.3)
+
+                # data pulse position adjustment == phase correction
+                self.distance_to_next_pulse -= error * 0.5
+
+                # cell size adjustment == frequency correction
+                new_cell_size = self.cell_size + error * 0.1
+                new_cell_size = max(new_cell_size, self.cell_size_ref * 0.8)
+                new_cell_size = min(new_cell_size, self.cell_size_ref * 1.2)
                 self.set_cell_size(new_cell_size)
+
                 self.distance_to_next_pulse += distance
             if self.distance_to_next_pulse >= self.cell_size:
                 break
         if self.distance_to_next_pulse >= self.cell_size:
             self.distance_to_next_pulse -= self.cell_size
         return bit_reading
+
+
+    # Read next 1 bit (for analysis)
+    def get_bit_ex(self):
+        bit_reading = 0
+        advance_cell = False
+        pulse_pos = 0
+
+        while True:
+            if self.distance_to_next_pulse < self.cell_size:
+                pulse_pos = self.distance_to_next_pulse
+                if self.distance_to_next_pulse >= self.window_ofst and \
+                   self.distance_to_next_pulse <  self.window_ofst + self.window_size:
+                    bit_reading = 1
+                else:
+                    pass    # irregular pulse
+                distance = self.distance_to_next_bit1()
+                if distance == -1:
+                    return -1
+
+                cell_center = self.window_ofst + self.window_size / 2;
+                error = self.distance_to_next_pulse - cell_center
+
+                # data pulse position adjustment == phase correction
+                self.distance_to_next_pulse -= error * 0.5
+
+                # cell size adjustment == frequency correction
+                new_cell_size = self.cell_size + error * 0.1
+                new_cell_size = max(new_cell_size, self.cell_size_ref * 0.8)
+                new_cell_size = min(new_cell_size, self.cell_size_ref * 1.2)
+                self.set_cell_size(new_cell_size)
+
+                self.distance_to_next_pulse += distance
+            if self.distance_to_next_pulse >= self.cell_size:
+                advance_cell = True
+                break
+        if self.distance_to_next_pulse >= self.cell_size:
+            self.distance_to_next_pulse -= self.cell_size
+        return bit_reading, pulse_pos, advance_cell
 
     # cd_data = CDCDCD... extract only D bits
     def extract_data_bits(self, cd_data):
