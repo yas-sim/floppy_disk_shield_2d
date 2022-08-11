@@ -33,7 +33,7 @@ def main(args):
     for track_id in bs.disk:
         ttl_trk += 1
         track_data = bs.disk[track_id]     # pulse interval buffer
-        parser.set_interval_buf(track_data)
+        parser.set_bit_stream(track_data)
 
         # track = [[id_field, Data-CRC status, sect_data, DAM],...]
         #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]

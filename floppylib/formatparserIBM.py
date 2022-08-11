@@ -109,7 +109,8 @@ class FormatParserIBM:
             mc_buf.append(mc)
         return mfm_buf, mc_buf
 
-
+    def set_bit_stream(self, bit_stream):
+        self.bit_stream = bit_stream
 
     def search_all_idam(self, abort_by_idxmark=True, abort_by_sameid=True):
         """
