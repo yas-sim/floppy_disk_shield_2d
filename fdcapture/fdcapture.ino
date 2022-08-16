@@ -33,7 +33,7 @@ class FDD {
     int drive_type;     // 0=2D, 1=2DD/2HD
     int media_type;     // 0=2D, 1=2DD/2HD
   public:
-    FDD() {}
+    FDD() : drive_type(0), media_type(0) {}
 
     enum ENUM_DRV_MODE {
       mode_2d  = 0,
@@ -130,9 +130,16 @@ class FDD {
     }
 
     inline void waitIndex(void) {      // wait for the index hole detection
-      while (readIndex() == LOW);
-      delay(10);
-      while (readIndex() == HIGH);
+//      while (readIndex() == LOW);
+//      delay(10);
+//      while (readIndex() == HIGH);
+        int curr = HIGH;
+        int prev = readIndex();
+        while(true) {
+          curr = readIndex();
+          if(prev==HIGH && curr==LOW) break;   // detect falling edge
+          prev = curr;
+        }
     }
 
     void seek(int current, int target) {
