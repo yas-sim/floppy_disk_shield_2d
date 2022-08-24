@@ -435,7 +435,8 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
         count++;
       } else {
         if (count <= 'z' - ' ') {
-          out = count + ' ';
+          if(count<0) out = 'z';    // safety
+          else        out = count + ' ';
           if (chr_count % 100 == 0) {
             Serial.write('~');    // Start line code
           }
