@@ -11,7 +11,7 @@ def main(args):
         base, ext = os.path.splitext(args.input)
         out_name = base + '.d77'
     else:
-        out_name = args.input
+        out_name = args.output
 
     # read a bitstream file
     bs = bitstream()
