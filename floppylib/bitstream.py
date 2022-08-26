@@ -39,7 +39,9 @@ class bitstream:
                     for ch in linebuf:
                         for zero in range(ord(ch)-ord(' ')-1):
                             bit_stream.append(0)
-                        bit_stream.append(1)
+                        if ch != '{':
+                            bit_stream.append(1)        # If the ch=='{', no pulse will generate (just extend the period)
+                        
                     key = '{}-{}'.format(trk, side)
                     self.disk[key] = bit_stream
                 elif line[0]=='~':         # the data lines must start with '~'
