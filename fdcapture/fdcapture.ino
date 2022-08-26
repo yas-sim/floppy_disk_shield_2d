@@ -1,6 +1,7 @@
 // 2D/2DD Floppy disk capture shield control software
 
 #include <stdio.h>
+#include <limits.h>
 
 #include <SPI.h>
 #include <avr/pgmspace.h>
@@ -127,6 +128,11 @@ class FDD {
       while (readTRK00() == HIGH) {
         stepOut();
       }
+#if 0
+      if (drive_type == 1) {
+        stepIn();   // 2DD/2HD
+      }
+#endif
     }
 
     inline void waitIndex(void) {      // wait for the index hole detection
@@ -428,27 +434,28 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   byte out;
   for (unsigned long i = 0; i < bytes; i++) {
     int dt = SPISRAM.transfer(0);
+    const byte encode_base = ' ';
+    const byte max_length = 'z'-encode_base;
+    const byte extend_char = '{';
     for (int p = 0; p < 8; p++) {
       b = ((dt & 0x80u) == 0x80u) ? 1 : 0;
       dt <<= 1;
-      if (b == prev) {
-        count++;
-      } else {
-        if (count <= 'z' - ' ') {
-          if(count<0) out = 'z';    // safety
-          else        out = count + ' ';
-          if (chr_count % 100 == 0) {
-            Serial.write('~');    // Start line code
-          }
-          Serial.write(out);
-          count = 1;
-          chr_count++;
-          if (chr_count % 100 == 99) {
-            chr_count = 0;
-            Serial.println("");
-          }
-        } else {
-          // Suppress output for extraordinay long pulse period data (=sort of noise)
+      if (b == prev) {    // no pulse
+        if(++count >= max_length) {
+          Serial.write(extend_char);        // state extend character (extend pulse-to-pulse period without pulse)
+          count -= max_length;
+        }
+      } else {            // pulse
+        out = count + encode_base;
+        if (chr_count % 100 == 0) {
+          Serial.write('~');    // Start line code
+        }
+        Serial.write(out);
+        count = 1;
+        chr_count++;
+        if (chr_count % 100 == 99) {
+          chr_count = 0;
+          Serial.println("");
         }
       }
       prev = b;
