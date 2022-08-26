@@ -15,8 +15,13 @@ C2: ' D D  C * C  D  '
 A1: ' D   D  C * C  D'
 """
 
+
+from floppylib.vfo import vfo_simple2
+
+
 class data_separator:
-    def __init__(self, bit_stream, clk_spd =4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
+    def __init__(self, bit_stream=None, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
+        self.vfo = vfo_simple2()
         self.rewind()
         self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
         self.bit_stream = bit_stream
@@ -36,14 +41,13 @@ class data_separator:
         self.time = 0       # real time value at the current read pointer (ns)
 
     def set_gain(self, high_gain, low_gain):
-        self.high_gain = high_gain
-        self.low_gain  = low_gain
+        self.vfo.set_gain(low_gain, high_gain)
 
     def switch_gain(self, gain_mode):
         if gain_mode == 1:
-            self.gain = self.high_gain
+            self.vfo.set_gain_mode(False)  # High
         else:
-            self.gain = self.low_gain
+            self.vfo.set_gain_mode(False)  # Low
 
     def set_mode(self, mode):
         """
@@ -59,8 +63,6 @@ class data_separator:
         self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns] 4MHz == 250ns
         self.spin_speed     = spin_spd                 # ms/spin
         self.bit_rate       = 500e3                    # 500HKz
-        self.cell_size_ref  = self.clock_speed / self.bit_rate
-        self.set_cell_size(self.cell_size_ref)
         self.bit_stream     = []
         self.set_gain(high_gain=high_gain, low_gain=low_gain)
         self.switch_gain(0)         # low speed gain
@@ -69,6 +71,7 @@ class data_separator:
         self.distance_to_next_pulse = 0
         self.cell_pos = 0
         self.prev_cell_pos = 0
+        self.vfo.reset()
 
     def calc_time_from_pos(self, pos):
         tm = 0
@@ -100,7 +103,7 @@ class data_separator:
             return -1
         return val
 
-    def distance_to_next_bit1(self):
+    def get_distance_to_next_pulse(self):
         distance = 0
         while True:
             bit = self.read_stream()
@@ -113,41 +116,32 @@ class data_separator:
                 return distance
 
     def set_cell_size(self, cell_size):
-        self.cell_size = cell_size
-        self.window_size = cell_size / 2
-        self.window_ofst = cell_size / 4
+        self.vfo.set_cell_size(cell_size)
 
     # Read next 1 bit (for actual reading)
     def get_bit(self):
         bit_reading = 0
         while True:
-            if self.distance_to_next_pulse < self.cell_size:
-                if self.distance_to_next_pulse >= self.window_ofst and \
-                   self.distance_to_next_pulse <  self.window_ofst + self.window_size:
+            if self.distance_to_next_pulse < self.vfo.cell_size:
+                if self.distance_to_next_pulse >= self.vfo.window_ofst and \
+                   self.distance_to_next_pulse <  self.vfo.window_ofst + self.vfo.window_size:
                     bit_reading = 1
                 else:
                     pass    # irregular pulse
-                distance = self.distance_to_next_bit1()
+
+                self.distance_to_next_pulse = self.vfo.calc(self.distance_to_next_pulse)
+
+                distance = self.get_distance_to_next_pulse()
                 if distance == -1:
                     return -1
 
-                cell_center = self.window_ofst + self.window_size / 2;
-                error = self.distance_to_next_pulse - cell_center
-
-                # data pulse position adjustment == phase correction
-                self.distance_to_next_pulse -= error * 0.5
-
-                # cell size adjustment == frequency correction
-                new_cell_size = self.cell_size + error * 0.1
-                new_cell_size = max(new_cell_size, self.cell_size_ref * 0.8)
-                new_cell_size = min(new_cell_size, self.cell_size_ref * 1.2)
-                self.set_cell_size(new_cell_size)
-
                 self.distance_to_next_pulse += distance
-            if self.distance_to_next_pulse >= self.cell_size:
+
+            if self.distance_to_next_pulse >= self.vfo.cell_size:
                 break
-        if self.distance_to_next_pulse >= self.cell_size:
-            self.distance_to_next_pulse -= self.cell_size
+
+        if self.distance_to_next_pulse >= self.vfo.cell_size:
+            self.distance_to_next_pulse -= self.vfo.cell_size
         return bit_reading
 
 
@@ -165,7 +159,7 @@ class data_separator:
                     bit_reading = 1
                 else:
                     pass    # irregular pulse
-                distance = self.distance_to_next_bit1()
+                distance = self.get_distance_to_next_pulse()
                 if distance == -1:
                     return -1
 
