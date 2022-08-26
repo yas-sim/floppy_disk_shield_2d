@@ -257,7 +257,7 @@ class FDCapture {
 class SPISRAM {
   public:
     const unsigned long SPI_CLK = 4e6;
-    const unsigned long SPISRAM_CAPACITY = 2 * 65535UL; // 1Mbit SRAM
+    const unsigned long SPISRAM_CAPACITY = 2 * 65536UL; // 1Mbit SRAM (bytes)
 
     SPISRAM() { }
 
@@ -438,22 +438,30 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
     const byte max_length = 'z'-encode_base;
     const byte extend_char = '{';
     for (int p = 0; p < 8; p++) {
-      b = ((dt & 0x80u) == 0x80u) ? 1 : 0;
+      b = (dt & 0x80u) ? 1 : 0;
       dt <<= 1;
       if (b == prev) {    // no pulse
         if(++count >= max_length) {
+          if (chr_count == 0) {
+            Serial.write('~');    // Start line code
+          }
           Serial.write(extend_char);        // state extend character (extend pulse-to-pulse period without pulse)
           count -= max_length;
+          chr_count++;
+          if (chr_count == 99) {
+            chr_count = 0;
+            Serial.println("");
+          }
         }
       } else {            // pulse
         out = count + encode_base;
-        if (chr_count % 100 == 0) {
+        if (chr_count == 0) {
           Serial.write('~');    // Start line code
         }
         Serial.write(out);
         count = 1;
         chr_count++;
-        if (chr_count % 100 == 99) {
+        if (chr_count == 99) {
           chr_count = 0;
           Serial.println("");
         }
@@ -538,6 +546,11 @@ void trackRead(int read_overlap) {
 // Read tracks  (track # = 0-79 (,83))
 void read_tracks(int start_track, int end_track, int read_overlap) {
   FDD.track00();
+  const unsigned long capture_capacity_byte = 
+    (unsigned long)((float)SPISRAM.SPI_CLK * (float)g_spin_ms * ((float)(read_overlap+100)/100.f) ) / 8 / 1000;
+  Serial.print(";CAPACITY[bytes]:");
+  Serial.print(capture_capacity_byte);
+  Serial.print("\n");
   size_t curr_trk = 0;
   for (size_t trk = start_track; trk <= end_track; trk++) {
     size_t fdd_track = trk / 2;
@@ -555,7 +568,8 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 
     trackRead(read_overlap);
 
-    dumpTrack_encode(TRACK_CAPACITY);
+    dumpTrack_encode(capture_capacity_byte);
+    //dumpTrack_encode(TRACK_CAPACITY);
     Serial.println(F("**TRACK_END"));
   }
   //dumpTrack_hex(TRACK_CAPACITY);
