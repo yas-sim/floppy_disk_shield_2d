@@ -43,7 +43,7 @@ class decode_MFM:
         self.read_bit_count += 1
 
         self.cd_stream = ((self.cd_stream<<1) | bit) & 0xffffffffffffffff
-        if self.mode == 0 and ((self.cd_stream & 0x7fff) in self.missing_clock):
+        if self.mode == 0 and (self.read_bit_count & 1) == 0 and ((self.cd_stream & 0x7fff) in self.missing_clock):  # Ignore MC compare on clock cycle
             data = self.data
             self.data = 0
             self.read_bit_count = 0
