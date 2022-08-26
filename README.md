@@ -41,6 +41,11 @@ The system consists of the hardware and software:
 |`d77enc.py`|Generate a D77/D88 disk image data from a JSON file|
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
 |[`kfx2bs.py`](./docs/kfx2bs.md)|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and use it.|
+
+### fdc_bitstream  
+The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project that provides a bit-accurate software FDC library. The fdc_bitstream project includes a disk image converter and image analyzer. Those software are written in C++, so they are faster than the converters in this project. Also, they are developed recently and have better algorithms for format conversion.  Please try `image_converter` in the `fdc_bitstream` project as well.  
+[`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream)はビット精度で正確なソフトウエアFDCを開発するプロジェクトです。fdc_bitstreamプロジェクトにもイメージ変換ツールとイメージ解析ツールが含まれています。これらのツールはC++でかかれており、より高速です。またこちらのほうが開発が後なのでより良いアルゴリズムが使われており、イメージ変換の正確性も上がっています。fdc_bitstreamプロジェクトのimage_converterもお試しください。  
+
 ### System Diagram
 ![system_diagram](resources/fd-shield.jpg)
 
