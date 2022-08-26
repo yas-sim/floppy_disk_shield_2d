@@ -196,7 +196,7 @@ class data_separator:
 
             self.cd_stream = ((self.cd_stream<<1) | bit) & 0xffffffffffffffff
 
-            if self.mode == 0 and (read_bit_count & 1)==1 and ((self.cd_stream & 0xffff) in self.missing_clock):  # missing clock pattern check
+            if self.mode == 0 and (read_bit_count & 1)==0 and ((self.cd_stream & 0xffff) in self.missing_clock):  # missing clock pattern check
                 return self.extract_data_bits(self.cd_stream), True
 
             if self.mode == 0 and (self.cd_stream in self.sync_pattern):   # SYNC pattern check
