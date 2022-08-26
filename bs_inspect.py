@@ -92,9 +92,9 @@ def timing_history(bit_stream, spin_spd, args):
             bit_sts = 0
 
         if count % 1==0:
-            cell_size = ds.cell_size
-            window_start = ds.window_ofst
-            window_end   = ds.window_ofst + ds.window_size
+            cell_size = ds.vfo.cell_size
+            window_start = ds.vfo.window_ofst
+            window_end   = ds.vfo.window_ofst + ds.vfo.window_size
             img[:-ystep, :, :] = img[ystep:, :, :]  # scroll up
             img[-ystep:, :, :] = [0,0,0]
             img[-1, int((graph_x_ofst               )*xstep):int((graph_x_ofst + cell_size) *xstep), :] = [0,0,255]
