@@ -46,9 +46,26 @@ def main(args):
                 continue
             line = line.decode(encoding='ascii', errors='ignore')
             if line[:5] == '++CMD':         # Command prompt
-                media_type = 1 if args.media_type == '2DD' else 0 
-                uart.write('+R {} {} {} {}\n'.format(args.start_track, args.end_track, media_type, args.read_overlap).encode('ascii'))
-                f.write('**TRACK_RANGE {} {}\n'.format(args.start_track, args.end_track))
+                start_track = 0
+                if args.media_type == '2DD':
+                    media_type = 1
+                    bit_rate = 500e3
+                    end_track = 163
+                elif args.media_type == '2HD':
+                    media_type = 1
+                    bit_rate = 1e6
+                    end_track = 163
+                else:
+                    media_type = 0
+                    bit_rate = 500e3
+                    end_track = 83
+                if args.start_track != -1:
+                    start_track = args.start_track
+                if args.end_track != -1:
+                    end_track = args.end_track
+                uart.write('+R {} {} {} {}\n'.format(start_track, end_track, media_type, args.read_overlap).encode('ascii'))
+                f.write('**BIT_RATE {}\n'.format(int(bit_rate)))
+                f.write('**TRACK_RANGE {} {}\n'.format(start_track, end_track))
                 f.write('**MEDIA_TYPE {}\n'.format(args.media_type))
             if line[:2] == '**' or line[:2] == '##':
                 print('\n' + line)
@@ -70,9 +87,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output raw bit stream file name (Default = fdshield_(DATE-TIME).raw)')
-    parser.add_argument('--start_track', type=int, required=False, default=0, help='start track number')
-    parser.add_argument('--end_track', type=int, required=False, default=79, help='end track number')
-    parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D or 2DD)')
+    parser.add_argument('--start_track', type=int, required=False, default=-1, help='start track number')
+    parser.add_argument('--end_track', type=int, required=False, default=-1, help='end track number')
+    parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D, 2DD or 2HD)')
     parser.add_argument('--read_overlap', type=int, required=False, default=0, help='track read 2nd lap overlap percentage (default = 0 %)')
     args = parser.parse_args()
 

@@ -546,11 +546,15 @@ void trackRead(int read_overlap) {
 // Read tracks  (track # = 0-79 (,83))
 void read_tracks(int start_track, int end_track, int read_overlap) {
   FDD.track00();
+
+  Serial.print("**SAMPLING_RATE 4000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
+
   const unsigned long capture_capacity_byte = 
     (unsigned long)((float)SPISRAM.SPI_CLK * (float)g_spin_ms * ((float)(read_overlap+100)/100.f) ) / 8 / 1000;
   Serial.print(";CAPACITY[bytes]:");
   Serial.print(capture_capacity_byte);
   Serial.print("\n");
+
   size_t curr_trk = 0;
   for (size_t trk = start_track; trk <= end_track; trk++) {
     size_t fdd_track = trk / 2;
@@ -569,7 +573,7 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
     trackRead(read_overlap);
 
     dumpTrack_encode(capture_capacity_byte);
-    //dumpTrack_encode(TRACK_CAPACITY);
+    //dumpTrack_encode(TRACK_CAPACITY);    // SPI SRAM full dump
     Serial.println(F("**TRACK_END"));
   }
   //dumpTrack_hex(TRACK_CAPACITY);
