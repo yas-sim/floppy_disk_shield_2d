@@ -41,6 +41,12 @@ class FDD {
       mode_2dd = 1
     };
 
+    enum ENUM_MEDIA_TYPE {
+      media_2d = 0,
+      media_2dd = 1,
+      media_2hd = 2
+    };
+
 
     void init( void ) {
       pinMode(FD_HEAD_LOAD, OUTPUT);  // Head Load     L=contact
@@ -94,8 +100,8 @@ class FDD {
     }
 
     void step(void) {
-      int iter = (drive_type == ENUM_DRV_MODE::mode_2d) ? 1 : 2;
-      for (int i = 0; i < iter; i++) {
+      int step_n = (drive_type == ENUM_DRV_MODE::mode_2dd && media_type == ENUM_MEDIA_TYPE::media_2d) ? 2 : 1;
+      for (int i = 0; i < step_n; i++) {
         step1();
       }
     }
@@ -655,6 +661,7 @@ void loop() {
     int start_track, end_track;
     int read_overlap;   // track read overlap (%)
     sscanf(cmdBuf, "+%c %d %d %d %d", &cmd, &start_track, &end_track, &media_mode, &read_overlap);
+    FDD.set_media_type(media_mode);
     Serial.println(F("**START"));
 
     // Detect FDD type (2D/2DD)
