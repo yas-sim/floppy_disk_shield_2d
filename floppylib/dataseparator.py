@@ -15,13 +15,13 @@ C2: ' D D  C * C  D  '
 A1: ' D   D  C * C  D'
 """
 
-
-from floppylib.vfo import vfo_simple2
-
+# Import all VFOs
+from floppylib.vfo import *
 
 class data_separator:
     def __init__(self, bit_stream=None, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
-        self.vfo = vfo_simple2()
+        #self.vfo = vfo_simple2()
+        self.vfo = vfo_pid3()
         self.rewind()
         self.reset(clk_spd=clk_spd, spin_spd=spin_spd, high_gain=high_gain, low_gain=low_gain)
         self.bit_stream = bit_stream
