@@ -19,7 +19,7 @@ A1: ' D   D  C * C  D'
 from floppylib.vfo import *
 
 class data_separator:
-    def __init__(self, bit_stream=None, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
+    def __init__(self, bit_stream=None, clk_spd=4e6, spin_spd=0.2, high_gain=1, low_gain=1):
         #self.vfo = vfo_simple2()
         self.vfo = vfo_pid3()
         self.rewind()
@@ -45,7 +45,7 @@ class data_separator:
 
     def switch_gain(self, gain_mode):
         if gain_mode == 1:
-            self.vfo.set_gain_mode(False)  # High
+            self.vfo.set_gain_mode(True)  # High
         else:
             self.vfo.set_gain_mode(False)  # Low
 
@@ -58,7 +58,7 @@ class data_separator:
         """
         self.mode = mode
 
-    def reset(self, clk_spd=4e6, spin_spd=0.2, high_gain=0.3, low_gain=0.01):
+    def reset(self, clk_spd=4e6, spin_spd=0.2, high_gain=1, low_gain=1):
         self.clock_speed    = clk_spd
         self.clock_cycle_ns = 1e9/clk_spd              # clock cycle in [ns] 4MHz == 250ns
         self.spin_speed     = spin_spd                 # ms/spin

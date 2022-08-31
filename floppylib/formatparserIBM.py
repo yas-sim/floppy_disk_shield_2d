@@ -7,7 +7,7 @@ from floppylib.crc import CCITT_CRC
 from floppylib.dataseparator import data_separator
 
 class FormatParserIBM:
-    def __init__(self, bit_stream, clk_spd = 4e6, spin_spd = 0.2, high_gain = 2, low_gain = 1, log_level = 0):
+    def __init__(self, bit_stream, clk_spd = 4e6, spin_spd = 0.2, high_gain = 1, low_gain = 1, log_level = 0):
         self.bit_stream   = bit_stream
         self.clk_spd      = clk_spd
         self.spin_spd     = spin_spd

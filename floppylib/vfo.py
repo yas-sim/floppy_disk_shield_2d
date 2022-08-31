@@ -6,7 +6,7 @@
 class vfo_base:
     def __init__(self):
         self.set_cell_size_ref(8.0)
-        self.set_gain(1.0, 2.0)
+        self.set_gain(1.0, 1.0)
         self.set_gain_mode(False)
     
     def reset(self):
@@ -24,7 +24,7 @@ class vfo_base:
         self.window_ofst = (self.cell_size - self.window_size) / 2.0
         self.cell_center = self.cell_size / 2.0
 
-    def set_gain(self, gain_l:float=1.0, gain_h:float=2.0):
+    def set_gain(self, gain_l:float=1.0, gain_h:float=1.0):
         self.gain_l = gain_l
         self.gain_h = gain_h
 
@@ -65,6 +65,7 @@ class vfo_pid3(vfo_base):
         self.coeff_sum = 0
         for i in range(1, self.history_len + 1):
             self.coeff_sum += i
+        self.reset()
 
     def reset(self):
         super().reset()
@@ -98,8 +99,8 @@ class vfo_pid3(vfo_base):
 
         # Limit cell size
         tolerance = 0.8
-        new_cell_size = min(new_cell_size, self.cell_size_ref * (1 + tolerance))
-        new_cell_size = max(new_cell_size, self.cell_size_ref * (1 - tolerance))
+        new_cell_size = min(new_cell_size, self.cell_size_ref *     (1 + tolerance))
+        new_cell_size = max(new_cell_size, self.cell_size_ref * 1 / (1 + tolerance))
 
         self.set_cell_size(new_cell_size)
         self.prev_pulse_pos = pulse_pos

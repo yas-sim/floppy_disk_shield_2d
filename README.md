@@ -1,7 +1,7 @@
 # Floppy Disk Shield for Arduino UNO
 
 ## Caveat and Disclaimer - Read before you build a fd-shield  
-- **The project is still WIP**
+
 - I don't own any responsibility for the data loss or physical damage on your floppy disks or computer assets caused by the use of hardware and software included in this project.
 - Hardware compatibility (especially, FDD and FD-Shield compatibility) is not guaranteed. Your FDD may now work with the FD-Shield.  
 - The magnetic flux power on the old floppy disks are dropping and getting weak as time passes. Read-out data integrity with this system is not guaranteed.
@@ -42,8 +42,13 @@ The system consists of the hardware and software:
 |`d77lib.py`|A libray which provides basic D77/D88 floppy disk image manipulation functions|
 |[`kfx2bs.py`](./docs/kfx2bs.md)|[**KyroFlux**](https://www.kryoflux.com/) raw-bitstream data to fd-shield bit-stream data converter. You can capture FD image with KryoFlux and use it.|
 
-### fdc_bitstream  
-The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project that provides a bit-accurate software FDC library. The fdc_bitstream project includes a disk image converter and image analyzer. Those software are written in C++, so they are faster than the converters in this project. Also, they are developed recently and have better algorithms for format conversion.  Please try `image_converter` in the `fdc_bitstream` project as well.  
+### Updates  
+|Date|Description|
+|-|-|
+|Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream]](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
+
+## fdc_bitstream  
+The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project that provides a bit-accurate C++ software FDC library. The fdc_bitstream project includes a disk image converter and image analyzer. Those software are written in C++, so they are faster than the converters in this project. Also, they are developed recently and have better algorithms for format conversion.  Please try `image_converter` in the `fdc_bitstream` project as well.  
 [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream)はビット精度で正確なソフトウエアFDCを開発するプロジェクトです。fdc_bitstreamプロジェクトにもイメージ変換ツールとイメージ解析ツールが含まれています。これらのツールはC++でかかれており、より高速です。またこちらのほうが開発が後なのでより良いアルゴリズムが使われており、イメージ変換の正確性も上がっています。fdc_bitstreamプロジェクトのimage_converterもお試しください。  
 
 ### System Diagram
