@@ -125,12 +125,6 @@ python bs2d77.py -i image_name.raw --abort_id
 - Drive spindle revolution measurement 
 - Generates D77mod disk images from the raw bitstream data
 
-**WIP**
-- Bug fix
-
-**Known Issues**
-- The last data bit in CRC field may be lost. This may cause a ID or Data CRC error.
-
 ## Test Environment
 
 - Windows 10 1909
