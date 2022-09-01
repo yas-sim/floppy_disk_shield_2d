@@ -156,7 +156,10 @@ python bs2d77.py -i image_name.raw --abort_id
 ### FD-shield - 3D view
 ![3D](resources/fdshield-3d.jpg)
 
-### FD-shield - Schematics
+### FD-shield - Schematics  
+Y1 (Xtal) = 4MHz X'tal.  
+U6 must be '74HC**U**04'. The standard '74HC04' doesn't work.  
+The other logic ICs can be either one of '74LS' or '74HC'.  
 ![schematics](resources/fdshield.svg)
 [PDF](resources/fdshield-schematics.pdf)
 
