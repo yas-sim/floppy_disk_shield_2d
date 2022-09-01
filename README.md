@@ -45,7 +45,7 @@ The system consists of the hardware and software:
 ### Updates  
 |Date|Description|
 |-|-|
-|Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream]](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
+|Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
 
 ## fdc_bitstream  
 The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project that provides a bit-accurate C++ software FDC library. The fdc_bitstream project includes a disk image converter and image analyzer. Those software are written in C++, so they are faster than the converters in this project. Also, they are developed recently and have better algorithms for format conversion.  Please try `image_converter` in the `fdc_bitstream` project as well.  
