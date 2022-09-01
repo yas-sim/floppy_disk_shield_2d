@@ -13,11 +13,11 @@ class vfo_base:
         self.set_cell_size(self.cell_size_ref)
         self.set_gain_mode(False)
 
-    def set_cell_size_ref(self, cell_size_ref:float=8.0, window_ratio:float=1.0):
+    def set_cell_size_ref(self, cell_size_ref:float=8.0, window_ratio:float=0.8):
         self.cell_size_ref = cell_size_ref
         self.set_cell_size(cell_size_ref, window_ratio)
 
-    def set_cell_size(self, cell_size:float=8.0, window_ratio:float=1.0):
+    def set_cell_size(self, cell_size:float=8.0, window_ratio:float=0.8):
         self.cell_size = cell_size
         self.window_ratio = window_ratio
         self.window_size = self.cell_size * self.window_ratio

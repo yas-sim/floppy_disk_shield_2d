@@ -96,8 +96,8 @@ def timing_history(bit_stream, spin_spd, args):
             window_start = ds.vfo.window_ofst
             window_end   = ds.vfo.window_ofst + ds.vfo.window_size
             img[:-ystep, :, :] = img[ystep:, :, :]  # scroll up
-            img[-ystep:, :, :] = [0,0,0]
-            img[-1, int((graph_x_ofst               )*xstep):int((graph_x_ofst + cell_size) *xstep), :] = [0,0,255]
+            img[-ystep:, :, :] = [64,0,0]
+            img[-1, int((graph_x_ofst               )*xstep):int((graph_x_ofst + cell_size) *xstep), :] = [0,0,128]
             img[-1, int((graph_x_ofst + window_start)*xstep):int((graph_x_ofst + window_end)*xstep), :] = [255,0,0]
         pos = int((graph_x_ofst + pos)*xstep)
         dataPos = min(pos, img.shape[1]-1)
@@ -144,6 +144,50 @@ def histogram(bit_stream):
     ax2.hist(interval_buf, bins=80, range=(0,80), histtype='stepfilled', orientation='vertical', log=True)
 
     plt.show()
+
+def pulse_pitch_variation(bit_stream, sampling_rate, bit_rate):
+    pulse_pitch = []
+    bit_cell_ref = sampling_rate / bit_rate
+    bit_cell = bit_cell_ref
+    ring_buf = [ bit_cell_ref for _ in range(16) ]
+    ring_ptr = 0
+    dist = 0
+    for bit in bit_stream:
+        if bit == 0:
+            pulse_pitch.append(bit_cell)
+            dist += 1
+        else:
+            quantized = int((dist / bit_cell_ref) + 0.5)
+            if quantized != 0:
+                bit_cell = dist / quantized
+
+            # smoothing
+            ring_buf[ring_ptr] = bit_cell
+            ring_ptr += 1
+            if ring_ptr >= len(ring_buf):
+                ring_ptr = 0
+            sum = 0
+            for val in ring_buf:
+                sum += val
+            avg = sum / len(ring_buf)
+
+            bit_cell = avg
+            pulse_pitch.append(bit_cell)
+            dist = 0
+
+    x_axis = [ i for i in range(len(pulse_pitch)) ]
+
+    fig = plt.figure(figsize=(8,4), dpi=200)
+    ax1 = fig.add_subplot(1,1,1)
+
+    ax1.set_title('bit_cell pitch variation')
+    ax1.set_xlabel('bit cell count')
+    ax1.set_ylabel('bit cell pitch')
+    ax1.set_ylim(0, 12)
+    ax1.grid(True)
+    ax1.plot(x_axis, pulse_pitch)
+    plt.show()
+
 
 def mfm_dump(bit_stream, spin_spd, args):
     parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
@@ -230,6 +274,8 @@ def main(args):
             read_sectors(bit_stream, spin_speed, args)
         if args.ascii_dump:
             ascii_dump(bit_stream, spin_speed, args)
+        if args.pulse_pitch:
+            pulse_pitch_variation(bit_stream, 4e6, 500e3)
 
 
 if __name__ == '__main__':
@@ -242,6 +288,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_level', type=int, required=False, default=0, choices=(0,1,2) ,help='log level: 0=off, 1=minimum, 2=verbose')
     parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4000000)')
     parser.add_argument('--histogram', action='store_true', default=False, help='display histogram of the pulse interval buffer')
+    parser.add_argument('--pulse_pitch', action='store_true', default=False, help='display pulse pitch variation in a track')
     parser.add_argument('--history', action='store_true', default=False, help='display history graph of the pulse interval buffer')
     parser.add_argument('--mfm_dump', action='store_true', default=False, help='display MFM decoded data in HEX dump style')
     parser.add_argument('--ascii_dump', action='store_true', default=False, help='display printable data in the sectors')

@@ -76,12 +76,20 @@ This tool provides featurs to analyze or check the bitstream data and its qualit
   * ASCII data dump (display pritable/readable data)
   * Tweak parameters (VFO high/low gain value, sampling frequency, FDD spin speed) 
 
-### Bitstream visualizer
-![history-good](resources/history-good.png)
-![history-bad](resources/history-bad.png)
+### Bitstream visualizer  
+You can check how VFO follows the variation of pulse pitch with the bitstream visualizer.  
+The VFO tries to keep the data pulse be the center of the bit cell as much as possible by tweaking the oscillation frequency (= the bit cell width).  
+![history-good](resources/history-1.png)
+![history-bad](resources/history-2.png)  
+
 ### Bitstream timing histogram viewer
 * Good case ![histogram-good](resources/histogram-good.png)
 * Bad case - The quality of data is bad. This might be caused by FDD quality (both writing drive and reading drive) and floppy disk media aging (magnetic flux power fading, contamination, etc).![histogram-bad](resources/histogram-bad.png)
+  
+### Pulse (bit) pitch visualizer  
+You can check the pulse pitch fluctuation throughout a track with the pulse pitch visualizer. The stabler pitch, the easier MFM decode or data read.  
+![good pitch](./resources/pulse_pitch_good.png)
+![bad pitch](./resources/pulse_pitch_bad.png)
 
 ---------
 
