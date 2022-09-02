@@ -19,12 +19,13 @@ optional arguments:
                         (track # should be 0-83 for 2D, 0-163 for 2DD)
   --high_gain HIGH_GAIN
                         data separator gain for high-speed tracking mode
-                        (default: 0, recommend: 0~0.4)
+                        (default: 1)
   --low_gain LOW_GAIN   data separator gain for low-speed tracking mode
-                        (default: 0, recommend: 0~high_gain)
+                        (default: 1)
   --log_level {0,1,2}   log level: 0=off, 1=minimum, 2=verbose
   --clk_spd CLK_SPD     FD-shield capture clock speed (default=4MHz=4000000)
   --histogram           display histogram of the pulse interval buffer
+  --pulse_pitch         display pulse pitch graph for a track
   --history             display history graph of the pulse interval buffer
   --mfm_dump            display MFM decoded data in HEX dump style
   --ascii_dump          display printable data in the sectors
@@ -38,13 +39,20 @@ optional arguments:
 ```sh
 python bs_inspect.py -i gutchan_bank.raw -t 0 --histogram
 ```
-![histogram](../resources/histogram.png)
+![histogram](../resources/histogram.png)  
 
 ```sh
 python bs_inspect.py -i gutchan_bank.raw -t 0 --history
 ```
-`ESC` to quit, `SPACE` to pause scrolling.
-![history](../resources/history.png)
+`ESC` to quit, `SPACE` to pause scrolling.  
+![history](../resources/history-1.png)  
+
+
+```sh
+python bs_inspect.py -i disk_img.raw -t 0 --pulse_pitch
+```
+![pitch](../resources/pulse_pitch_bad.png)  
+![pitch](../resources/pulse_pitch_good.png)  
 
 ```sh
 python bs_inspect.py -i gutchan_bank.raw -t 0 --mfm_dump

@@ -62,6 +62,8 @@ class decode_MFM:
             return data, False       # 8 bit data read completed
         return -1, False             # read data incomplete
 
+
+
 # Visualize bitstream timing
 def timing_history(bit_stream, spin_spd, args):
     val_max = 24
@@ -115,6 +117,7 @@ def timing_history(bit_stream, spin_spd, args):
             pause()
 
 
+
 def histogram(bit_stream):
     interval_buf = []
     dist = 0
@@ -145,34 +148,31 @@ def histogram(bit_stream):
 
     plt.show()
 
+
+
 def pulse_pitch_variation(bit_stream, sampling_rate, bit_rate):
     pulse_pitch = []
     bit_cell_ref = sampling_rate / bit_rate
-    bit_cell = bit_cell_ref
-    ring_buf = [ bit_cell_ref for _ in range(16) ]
+    avg_bit_cell = bit_cell_ref
+    ring_buf = [ bit_cell_ref for _ in range(32) ]
     ring_ptr = 0
     dist = 0
     for bit in bit_stream:
+        dist += 1
         if bit == 0:
-            pulse_pitch.append(bit_cell)
-            dist += 1
+            pulse_pitch.append(avg_bit_cell)
         else:
             quantized = int((dist / bit_cell_ref) + 0.5)
-            if quantized != 0:
-                bit_cell = dist / quantized
+            if quantized == 0:
+                quantized = 0.1
 
-            # smoothing
-            ring_buf[ring_ptr] = bit_cell
+            ring_buf[ring_ptr] = dist / quantized
             ring_ptr += 1
             if ring_ptr >= len(ring_buf):
                 ring_ptr = 0
-            sum = 0
-            for val in ring_buf:
-                sum += val
-            avg = sum / len(ring_buf)
+            avg_bit_cell = sum(ring_buf) / len(ring_buf)
 
-            bit_cell = avg
-            pulse_pitch.append(bit_cell)
+            pulse_pitch.append(avg_bit_cell)
             dist = 0
 
     x_axis = [ i for i in range(len(pulse_pitch)) ]
