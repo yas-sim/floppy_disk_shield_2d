@@ -52,15 +52,12 @@ The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project th
 [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream)はビット精度で正確なソフトウエアFDCを開発するプロジェクトです。fdc_bitstreamプロジェクトにもイメージ変換ツールとイメージ解析ツールが含まれています。これらのツールはC++でかかれており、より高速です。またこちらのほうが開発が後なのでより良いアルゴリズムが使われており、イメージ変換の正確性も上がっています。fdc_bitstreamプロジェクトのimage_converterもお試しください。  
 
 ### System Diagram
-![system_diagram](resources/fd-shield.jpg)
+![system_diagram](./resources/fd-shield-overview.jpg)
 
 ## FD-Shield - How It Works
-![FD_Shield How it works](resources/fd-shield1.jpg)
+![FD_Shield How it works](./resources/fd-shield1.jpg)
 
-![FD_Shield_Principal_of_operation](resources/fd-shield3a.jpg)
-
-![FD_Shield_Principal_of_operation](resources/fd-shield3b.jpg)
-
+![FD_Shield_Principal_of_operation](./resources/principle-of-operation.jpg)
 
 ---------
 
@@ -84,11 +81,14 @@ The VFO tries to keep the data pulse be the center of the bit cell as much as po
 
 ### Bitstream timing histogram viewer
 * Good case ![histogram-good](resources/histogram-good.png)
-* Bad case - The quality of data is bad. This might be caused by FDD quality (both writing drive and reading drive) and floppy disk media aging (magnetic flux power fading, contamination, etc).![histogram-bad](resources/histogram-bad.png)
+* Bad case - Usually, this may be caused by the spindle speed fluctuation (that causes data pulse pitch variation in a track), or data written by multiple drives (written with drives with different spindle motor speeds).  
+![histogram-bad](resources/histogram-bad.png)
   
 ### Pulse (bit) pitch visualizer  
 You can check the pulse pitch fluctuation throughout a track with the pulse pitch visualizer. The stabler pitch, the easier MFM decode or data read.  
+- Stable pitch  
 ![good pitch](./resources/pulse_pitch_good.png)
+- Unstable pitch. Heavily fluctuated. It's so hard to follow by the VFO. May fail data retrieving.  
 ![bad pitch](./resources/pulse_pitch_bad.png)
 
 ---------
@@ -104,13 +104,15 @@ Use `fdcapture.ino`
 - Connect a floppy shield and a floppy disk drive with a 36pin ribon cable
 - Connect Arduino UNO to PC via USB cable
 4. Read raw bit-stream data from a floppy disk - フロッピーからビットストリームデータを生成  
-- Insert a 2D floppy disk to the floppy disk drive (FDD) -- 2DD floppy disk can be read but it requires a simple code modification to change head seek method on `fdcapture.ino`.
+- Insert a 2D floppy disk to the floppy disk drive (FDD)
 - Run following command on the Windows PC:
 ```sh
-python transfer.py -o image_name.raw --read_overlap 5
+python transfer.py -o image_name.raw --read_overlap 5 [--media_type 2D|2DD]
 ```
-- `transfer.py` will search COM port for Arduino UNO and use it.
-- `--read_overlap` option specifies how much data to read on the 2nd lap in percent.
+- `transfer.py` will search COM port for Arduino UNO and use it.  
+- `--read_overlap` option specifies how much data to read on the 2nd lap in percent.  
+- `--media_type` option specifies the media type to read. `2D` or `2DD` are available.  
+Note: The `fdcapture.ino` can identify the drive type (2D or 2DD) but not the media type.    
 5. Convert raw bit-stream data into emulator image data (D77mod) -- ビットストリームからディスクイメージファイルを生成
 ```sh
 python bs2d77.py -i image_name.raw --abort_id
@@ -127,7 +129,7 @@ python bs2d77.py -i image_name.raw --abort_id
 
 ## Test Environment
 
-- Windows 10 1909
+- Windows 10 1909 / Windows 11 21H2
 - Arduino UNO
 - Floppy disk shield for Arduino
 - FDDs (table below)
@@ -158,7 +160,7 @@ python bs2d77.py -i image_name.raw --abort_id
 
 ### FD-shield - Schematics  
 Y1 (Xtal) = 4MHz X'tal.  
-U6 must be '74HC**U**04'. The standard '74HC04' doesn't work.  
+U6 must be '74HC**U**04' (unbuffered type). The standard '74HC04' doesn't work.  
 The other logic ICs can be either one of '74LS' or '74HC'.  
 ![schematics](resources/fdshield.svg)
 [PDF](resources/fdshield-schematics.pdf)
