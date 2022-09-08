@@ -120,6 +120,16 @@ python bs2d77.py -i image_name.raw --abort_id
 - `image_name.d77` will be generated.  
 **Note:** The `--abort_id` option enables abort reading track image when the same sector ID is detected. The FD-shield can read the top of the 2nd lap with `--read_overlap` option. This overlapped track data may contain the same sector data twice. This option will prevent from generating the same sector in a track.  
 
+
+## Accessory Tools  
+1. FDD spindle motor speed calibration tool  
+This tool measures the index hole to index hole time and show it on the screen. You can tweak a variable register on the FDD control board to adjust the spindle speed.  
+**CAUTION**: There might be multiple variable registers on the FDD control board. If you are unsure which one is the right one, do not turn it, or your FDD will become unfunctional.  
+- How to use:  
+	1. Set up `fdcapture` shield - Connect Arduino UNO, fdcapture shield, and FDD.   
+	2. Insert a floppy disk into the FDD.  
+	3. Run `spindle_calibration_tool.py`
+
 ## Current Development Status
 **Done:**
 - Read floppy disk images (2D disk on 2D drive, 2DD disk on 2D deive, 2D disk on 2DD/2HD drive)
