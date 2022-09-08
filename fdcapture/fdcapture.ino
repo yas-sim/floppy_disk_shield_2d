@@ -6,6 +6,13 @@
 #include <SPI.h>
 #include <avr/pgmspace.h>
 
+#include "fdd.h"
+#include "spi_sram.h"
+#include "fdcaptureshield.h"
+
+size_t g_spin_ms;         // FDD spin speed (ms)
+
+// GPIO mapping
 #define SPISRAM_HOLD  (A4)
 #define FD_TRK00      (A3)
 #define FD_READY      (A2)
@@ -24,414 +31,50 @@
 #define CAP_EN        (3)
 #define FD_WP         (2)
 
-#define STEP_RATE     (10)  /* ms */
-
-size_t g_spin_ms;         // FDD spin speed (ms)
-
-// This class changes the configuration of Timer 1 for disc rotate speed measurement purpose
-class FDD {
-  private:
-    int drive_type;     // 0=2D, 1=2DD/2HD
-    int media_type;     // 0=2D, 1=2DD/2HD
-  public:
-    FDD() : drive_type(0), media_type(0) {}
-
-    enum ENUM_DRV_MODE {
-      mode_2d  = 0,
-      mode_2dd = 1
-    };
-
-    enum ENUM_MEDIA_TYPE {
-      media_2d = 0,
-      media_2dd = 1,
-      media_2hd = 2
-    };
-
-
-    void init( void ) {
-      pinMode(FD_HEAD_LOAD, OUTPUT);  // Head Load     L=contact
-      pinMode(FD_MOTOR,     OUTPUT);  // Motor         L=ON
-      pinMode(FD_DIR,       OUTPUT);  // DIR           L=inside(trk+), H=outside (trk-)
-      pinMode(FD_STEP,      OUTPUT);  // Step  negative pulse
-      pinMode(FD_SIDE1,     OUTPUT);  // Side1 select  L=side0, H=side1
-      pinMode(FD_READY,     INPUT_PULLUP);
-      pinMode(FD_INDEX,     INPUT_PULLUP);   // Index    L=index
-      pinMode(FD_TRK00,     INPUT_PULLUP);   // TRACK00  L=TRK00
-      pinMode(FD_WP,        INPUT_PULLUP);
-
-      digitalWrite(FD_DIR,        HIGH);  // - direction
-      digitalWrite(FD_STEP,       HIGH);
-
-      set_drive_type(0); // 2D
-
-      motor(true);      // motor on
-      head(true);       // head load on
-      side(0);          // side 0
-    }
-
-    void set_drive_type(enum ENUM_DRV_MODE mode) {
-      drive_type = mode;
-    }
-
-    inline enum ENUM_DRV_MODE get_drive_type(void) {
-      return drive_type;
-    }
-
-    void set_media_type(enum ENUM_DRV_MODE mode) {
-      media_type = mode;
-    }
-
-    inline enum ENUM_DRV_MODE get_media_type(void) {
-      return media_type;
-    }
-
-    inline void step1(void) {
-#if 0
-        digitalWrite(FD_STEP, LOW);
-        delay(STEP_RATE/2);
-        digitalWrite(FD_STEP, HIGH);
-        delay(STEP_RATE/2);
-#else
-        digitalWrite(FD_STEP, LOW);
-        delayMicroseconds(1);
-        digitalWrite(FD_STEP, HIGH);
-        delay(STEP_RATE);
-#endif
-    }
-
-    void step(void) {
-      int step_n = (drive_type == ENUM_DRV_MODE::mode_2dd && media_type == ENUM_MEDIA_TYPE::media_2d) ? 2 : 1;
-      for (int i = 0; i < step_n; i++) {
-        step1();
-      }
-    }
-
-    void setStepDir(uint8_t dir) {
-      digitalWrite(FD_DIR, dir);
-    }
-
-    inline uint8_t readIndex(void) {
-      return digitalRead(FD_INDEX);
-    }
-
-    uint8_t readTRK00(void) {
-      return digitalRead(FD_TRK00);
-    }
-
-    void stepIn(void) {   // Step towards inner track (trk#++)
-      setStepDir(LOW);
-      step();
-    }
-
-    void stepOut(void) {  // Step towards outer track (trk#--)
-      setStepDir(HIGH);
-      if(readTRK00()==HIGH) {
-        step();
-      }
-    }
-
-    void track00(void) {
-      while (readTRK00() == HIGH) {
-        stepOut();
-      }
-#if 0
-      if (drive_type == 1) {
-        stepIn();   // 2DD/2HD
-      }
-#endif
-    }
-
-    inline void waitIndex(void) {      // wait for the index hole detection
-//      while (readIndex() == LOW);
-//      delay(10);
-//      while (readIndex() == HIGH);
-        int curr = HIGH;
-        int prev = readIndex();
-        while(true) {
-          curr = readIndex();
-          if(prev==HIGH && curr==LOW) break;   // detect falling edge
-          prev = curr;
-        }
-    }
-
-    void seek(int current, int target) {
-      if (current == target) return;
-      if (current < target) {
-        for (int i = 0; i < target - current; i++) {
-          stepIn();
-        }
-      } else {
-        for (int i = 0; i < current - target; i++) {
-          stepOut();
-        }
-      }
-    }
-
-    void side(int side) {
-      switch (side) {
-        case 0: digitalWrite(FD_SIDE1, HIGH); break;
-        case 1: digitalWrite(FD_SIDE1, LOW ); break;
-        default: break;
-      }
-    }
-
-    void motor(bool onoff) {
-      if (onoff) {
-        digitalWrite(FD_MOTOR, LOW);    // Motor start
-      } else {
-        digitalWrite(FD_MOTOR, HIGH);   // Motor stop
-      }
-    }
-
-    void head(bool onoff) {
-      if (onoff) {
-        digitalWrite(FD_HEAD_LOAD,  LOW);   // Head load on
-      } else {
-        digitalWrite(FD_HEAD_LOAD, HIGH);   // Head load off
-      }
-    }
-
-    void detect_drive_type(void) {
-      set_drive_type(ENUM_DRV_MODE::mode_2d);
-      track00();
-      seek(0,44);
-      seek(43,0);
-      Serial.print(F("**DRIVE_TYPE "));
-      if(readTRK00()==LOW) {
-        set_drive_type(ENUM_DRV_MODE::mode_2d);
-        Serial.println(F("2D"));
-      } else {
-        set_drive_type(ENUM_DRV_MODE::mode_2dd);
-        Serial.println(F("2DD"));
-      }
-    }
-
-    // TCNT1 = 250KHz count
-    // INDEX pulse = 4.33ms negative pulse
-
-    float measure_rpm() {
-#if defined(__AVR_ATmega328P__)
-      uint8_t TCCR1A_bkup = TCCR1A;
-      TCCR1A = TCCR1A & 0xfc;   // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
-
-      long tcnt1_, tcnt1;
-      waitIndex();
-      tcnt1_ = TCNT1;
-      waitIndex();
-      tcnt1 = TCNT1;
-      tcnt1 = tcnt1 > tcnt1_ ? tcnt1 - tcnt1_ : tcnt1 - tcnt1_ + 65535;
-      float spin = tcnt1 / 250e3;
-
-      TCCR1A = TCCR1A_bkup;
-#else
-      float spin = 0.2f;      // Arduino boards other than 'Uno' use fixed spin value
-#endif
-      return spin;            // sec/spin  default=0.2sec/spin(=300rpm)
-    }
-  
-} FDD;
-
-
-
-class FDCapture {
-  public:
-    FDCapture() { }
-
-    void init(void) {
-      disable();
-      digitalWrite(CAP_RST, LOW);
-      pinMode(CAP_RST,      OUTPUT);
-      pinMode(CAP_EN,       OUTPUT);
-      pinMode(CAP_ACTIVE,   OUTPUT);
-      delay(2);
-      digitalWrite(CAP_RST, HIGH);
-    }
-
-    inline void enable(void) {
-      digitalWrite(CAP_EN,     LOW);
-      digitalWrite(CAP_ACTIVE, HIGH);
-    }
-
-    inline void disable(void) {
-      digitalWrite(CAP_ACTIVE, LOW);
-      digitalWrite(CAP_EN,     HIGH);
-    }
-
-} FDCap;
-
-
-class SPISRAM {
-  public:
-    const unsigned long SPI_CLK = 4e6;
-    const unsigned long SPISRAM_CAPACITY = 2 * 65536UL; // 1Mbit SRAM (bytes)
-
-    SPISRAM() { }
-
-    void init(void) {
-      SPI.begin();
-      digitalWrite(SPISRAM_HOLD, HIGH);
-      pinMode(SPISRAM_HOLD, OUTPUT);
-      //reset();
-      setMode();
-    }
-
-    inline uint8_t transfer(uint8_t dt) {
-      return SPI.transfer(dt);
-    }
-
-    inline void hold(uint8_t state) {
-      digitalWrite(SPISRAM_HOLD, state);
-    }
-
-    void reset(void) {
-      for (int i = 0; i < 5; i++) {
-        beginAccess();
-        transfer(0xff); // RSTIO
-        endAccess();
-      }
-    }
-
-    inline void beginAccess(void) {
-      digitalWrite(SPI_SS, LOW);
-      SPI.beginTransaction(SPISettings(SPI_CLK, MSBFIRST, SPI_MODE0));
-    }
-
-    inline void endAccess(void) {
-      digitalWrite(SPI_SS, HIGH);
-      SPI.endTransaction();
-    }
-
-    void setMode(void) {
-      beginAccess();
-      transfer(0x01); // WRMR
-      transfer(0x40); // Mode=sequential
-      endAccess();
-    }
-
-    void beginWrite(void) {
-      beginAccess();
-      transfer(0x02); // Write command
-      transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)
-      transfer(0x00); // Address 1
-      transfer(0x00); // Address 0
-    }
-
-    void beginRead(void) {
-      beginAccess();
-      transfer(0x03); // Read command
-      transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)
-      transfer(0x00); // Address 1
-      transfer(0x00); // Address 0
-    }
-
-    void disconnect(void) {
-      digitalWrite(SPI_SCK, LOW);
-      pinMode(SPI_SS,   OUTPUT);
-      pinMode(SPI_SCK,  INPUT);
-      pinMode(SPI_MOSI, INPUT);
-      pinMode(SPI_MISO, INPUT);
-      SPCR &= ~0x40;    // SPE=0, SPI I/F disable
-    }
-
-    void connect(void) {
-      digitalWrite(SPI_SCK, LOW);
-      pinMode(SPI_SS,   OUTPUT);
-      pinMode(SPI_SCK,  OUTPUT);
-      pinMode(SPI_MOSI, OUTPUT);
-      pinMode(SPI_MISO, INPUT);
-      SPCR |= 0x40;    // SPE=1, SPI I/F enable
-    }
-
-    void fill(byte a) {
-      beginWrite();
-      for (unsigned long i = 0; i < SPISRAM_CAPACITY; i++) {
-        transfer(a + i);
-      }
-      endAccess();
-    }
-
-    void clear(void) {
-      beginWrite();
-      for (unsigned long i = 0; i < SPISRAM_CAPACITY; i++) {
-        transfer(0);
-      }
-      endAccess();
-    }
-
-    void dump(int count) {
-      beginRead();
-      byte dt;
-      for (int i = 0; i < count; i++) {
-        dt = transfer(0);
-        Serial.print(dt, DEC);
-        Serial.print(F(" "));
-      }
-      endAccess();
-      Serial.println(F(""));
-    }
-} SPISRAM;
-
-
-
-
-
-
-void print8BIN(byte dt) {
-  for (int i = 7; i >= 0; i--) {
-    Serial.print((dt >> i) & 1, DEC);
-  }
-}
-
-
-void printHex(byte dt) {
-  if (dt < 0x10) {
-    Serial.print(F("0"));
-  }
-  Serial.print(dt, HEX);
-}
-
-
-//const unsigned long TRACK_CAPACITY =  25000UL; // 200ms*1MHz /8bit
-//const unsigned long TRACK_CAPACITY   = 100000UL; // 200ms*4MHz /8bit
-const unsigned long TRACK_CAPACITY   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
+// Objects
+FDD fdd;
+SPISRAM spisram;
+FDCaptureShield FDCap;
+
+const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
 
 void dumpTrack_bit(unsigned long bytes = 0UL) {
-  SPISRAM.beginRead();
+  spisram.beginRead();
 
-  if (bytes == 0) bytes = TRACK_CAPACITY;
+  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
   for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = SPISRAM.transfer(0);
+    byte dt = spisram.transfer(0);
     print8BIN(dt);
     //Serial.print(F(" "));
   }
   Serial.println(F(" "));
-  SPISRAM.endAccess();
+  spisram.endAccess();
 }
 
 
 void dumpTrack_hex(unsigned long bytes = 0UL) {
 
   Serial.println(F("**TRACK_DUMP_START"));
-  SPISRAM.beginRead();
+  spisram.beginRead();
 
-  if (bytes == 0) bytes = TRACK_CAPACITY;
+  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
   for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = SPISRAM.transfer(0);
+    byte dt = spisram.transfer(0);
     printHex(dt);
     if (i % 64 == 63) {
       Serial.println(F(""));
     }
   }
-  SPISRAM.endAccess();
+  spisram.endAccess();
   Serial.println(F("**TRACK_DUMP_END"));
 }
 
 
 void dumpTrack_encode(unsigned long bytes = 0UL) {
 
-  SPISRAM.beginRead();
+  spisram.beginRead();
 
-  if (bytes == 0) bytes = TRACK_CAPACITY;
+  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
 
   int prev = 0;
   int count = 1;
@@ -439,7 +82,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   int chr_count = 0;
   byte out;
   for (unsigned long i = 0; i < bytes; i++) {
-    int dt = SPISRAM.transfer(0);
+    int dt = spisram.transfer(0);
     const byte encode_base = ' ';
     const byte max_length = 'z'-encode_base;
     const byte extend_char = '{';
@@ -475,7 +118,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
       prev = b;
     }
   }
-  SPISRAM.endAccess();
+  spisram.endAccess();
   Serial.println(F(""));
 }
 
@@ -484,14 +127,14 @@ void histogram(unsigned long bytes = 0UL) {
   unsigned int histo[10];
   for (int i = 0; i < 10; i++) histo[i] = 0UL;
 
-  SPISRAM.beginRead();
+  spisram.beginRead();
 
-  if (bytes == 0) bytes = TRACK_CAPACITY;
+  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
 
   int prev = 0;
   int count = 1;
   for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = SPISRAM.transfer(0);
+    byte dt = spisram.transfer(0);
     for (int j = 0; j < 8; j++) {
       int b = (dt & 0x80) == 0x80 ? 1 : 0;
       dt <<= 1;
@@ -504,7 +147,7 @@ void histogram(unsigned long bytes = 0UL) {
       }
     }
   }
-  SPISRAM.endAccess();
+  spisram.endAccess();
 
   for (int i = 0; i < 10; i++) {
     Serial.print(i);
@@ -518,45 +161,46 @@ void histogram(unsigned long bytes = 0UL) {
 void revolution_calibration(void) {
   float spin;
   while (1) {
-    spin = FDD.measure_rpm();
+    spin = fdd.measure_rpm();
     Serial.println(spin * 1000, DEC); // ms
   }
 }
 
 
 // Read single track
+// read_overlap: overlap percentage to a spin. '5' means +5% (in total 105%) of 1 spin time.
 void trackRead(int read_overlap) {
-  SPISRAM.beginWrite();
-  SPISRAM.hold(LOW);
-  SPISRAM.disconnect();           // Disconnect SPI SRAM from Arduino
+  spisram.beginWrite();
+  spisram.hold(LOW);
+  spisram.disconnect();           // Disconnect SPI SRAM from Arduino
 
-  FDD.waitIndex();
+  fdd.waitIndex();
 
   // Start captuering
-  SPISRAM.hold(HIGH);
+  spisram.hold(HIGH);
   FDCap.enable();
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
-  FDD.waitIndex();
+  fdd.waitIndex();
   delay((g_spin_ms * read_overlap) / 100);  // (overlap)% over capturing (read overlap)
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
 
   FDCap.disable();
-  SPISRAM.connect();
-  SPISRAM.endAccess();
+  spisram.connect();
+  spisram.endAccess();
 }
 
 
 // Read tracks  (track # = 0-79 (,83))
 void read_tracks(int start_track, int end_track, int read_overlap) {
-  FDD.track00();
+  fdd.track00();
 
   Serial.print("**SAMPLING_RATE 4000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
 
   const unsigned long capture_capacity_byte = 
-    (unsigned long)((float)SPISRAM.SPI_CLK * (float)g_spin_ms * ((float)(read_overlap+100)/100.f) ) / 8 / 1000;
+    (unsigned long)((float)spisram.SPI_CLK * (float)g_spin_ms * ((float)(read_overlap+100)/100.f) ) / 8 / 1000;
   Serial.print(";CAPACITY[bytes]:");
   Serial.print(capture_capacity_byte);
   Serial.print("\n");
@@ -565,11 +209,11 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
   for (size_t trk = start_track; trk <= end_track; trk++) {
     size_t fdd_track = trk / 2;
     size_t fdd_side  = trk % 2;
-    FDD.seek(curr_trk, fdd_track);
+    fdd.seek(curr_trk, fdd_track);
     curr_trk = fdd_track;
 
-    FDD.side(fdd_side);
-    SPISRAM.clear();
+    fdd.side(fdd_side);
+    spisram.clear();
 
     Serial.print(F("**TRACK_READ "));
     Serial.print(fdd_track);
@@ -579,10 +223,10 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
     trackRead(read_overlap);
 
     dumpTrack_encode(capture_capacity_byte);
-    //dumpTrack_encode(TRACK_CAPACITY);    // SPI SRAM full dump
+    //dumpTrack_encode(TRACK_CAPACITY_BYTE);    // SPI SRAM full dump
     Serial.println(F("**TRACK_END"));
   }
-  //dumpTrack_hex(TRACK_CAPACITY);
+  //dumpTrack_hex(TRACK_CAPACITY_BYTE);
   //dumpTrack_bit(10);
 }
 
@@ -590,9 +234,9 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 // Memory test
 void memory_test(void) {
   static int c = 0;
-  FDD.waitIndex();
-  SPISRAM.fill(c++);
-  SPISRAM.dump(40);
+  fdd.waitIndex();
+  spisram.fill(c++);
+  spisram.dump(40);
   //dumpTrack_bit();
 }
 
@@ -629,14 +273,14 @@ void readLine(byte buf[], const size_t buf_size) {
 void setup() {
   // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
   FDCap.init();
-  SPISRAM.init();
+  spisram.init();
 
   Serial.begin(115200);
 
-  FDD.init();                                     // Motor on, Head load on
+  fdd.init();                                     // Motor on, Head load on
   delay(200);
 
-  SPISRAM.clear();
+  spisram.clear();
 }
 
 // Command format
@@ -655,31 +299,30 @@ void loop() {
   cmd = toupper(cmdBuf[1]);
 
   if(cmd == 'R') {
-    FDD.head(true);
-    FDD.motor(true);
+    fdd.head(true);
+    fdd.motor(true);
     enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
     int start_track, end_track;
     int read_overlap;   // track read overlap (%)
     sscanf(cmdBuf, "+%c %d %d %d %d", &cmd, &start_track, &end_track, &media_mode, &read_overlap);
-    FDD.set_media_type(media_mode);
+    fdd.set_media_type(media_mode);
     Serial.println(F("**START"));
 
     // Detect FDD type (2D/2DD)
-    FDD.detect_drive_type();
-    FDD.track00();
+    fdd.detect_drive_type();
+    fdd.track00();
 
-    // Measure FDD spindle speed
+    // Measure FDD spindle speed (measure time for 5 spins)
     float spin = 0.f;
     for(int i=0; i<5; i++) {
-      spin += FDD.measure_rpm();
+      spin += fdd.measure_rpm();
     }
-
     spin /= 5;
     Serial.print(F("**SPIN_SPD "));
     Serial.println(spin,8);
     g_spin_ms = (int)(spin*1000);
 
-    int max_capture_time_ms = (int)(((SPISRAM.SPISRAM_CAPACITY*8.f) / SPISRAM.SPI_CLK)*1000.f);
+    int max_capture_time_ms = (int)(((spisram.SPISRAM_CAPACITY_BYTE*8.f) / spisram.SPI_CLK)*1000.f);
     int capture_time_ms     = (int)(g_spin_ms * (1.f + read_overlap/100.f));
     if(capture_time_ms > max_capture_time_ms) {
       read_overlap = (int)((((float)max_capture_time_ms / (float)g_spin_ms) - 1.f) * 100.f);
@@ -708,21 +351,21 @@ void loop() {
   if(cmd == 'S') {
     Serial.println(F("**Seek mode"));
     int current_track = 0, target_track, side, val;
-    FDD.track00();
+    fdd.track00();
     while(true) {
       readLine(cmdBuf, cmdBufSize);
       sscanf(cmdBuf, "%d", &val);
       if(val==0) {
         Serial.println(F("TRK00"));
-        FDD.track00();
+        fdd.track00();
         target_track = 0;
         side = 0;
       } else {
         side         = val % 2;
         target_track = val / 2;
-        FDD.seek(current_track, target_track);
+        fdd.seek(current_track, target_track);
       }
-      FDD.side(side);
+      fdd.side(side);
       Serial.print(target_track);
       Serial.print(" ");
       Serial.println(side);
@@ -730,8 +373,8 @@ void loop() {
     }
   }
 
-  FDD.head(false);
-  FDD.motor(false);
+  fdd.head(false);
+  fdd.motor(false);
 
   // Halt
   //while (true) delay(100);
