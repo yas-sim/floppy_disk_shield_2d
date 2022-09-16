@@ -1,5 +1,7 @@
 # bs2hfe.py
 
+Convert a RAW FD bit stream file (.raw) into a disk image for the HxC FDD emulator device (.hfe).  
+
 ```sh
 usage: bs2hfe.py [-h] -i INPUT [-o OUTPUT] [--log_level LOG_LEVEL] [--clk_spd CLK_SPD]
 ```
