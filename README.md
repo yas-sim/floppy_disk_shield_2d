@@ -34,7 +34,7 @@ The system consists of the hardware and software:
 |[`fdcapture.ino`](./docs/fdcapture_ino.md)|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
 |[`transfer.py`](./docs/transfer.md)|Transfers raw bitstream data from Arduino to a PC|
 |[`bs2d77.py`](./docs/bs2d77.md)|Bit-stream data (.raw) to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod uses some reserved bytes in the header but it is designed to keep backward compatibility with the standard D77 disk images. The D77mod image should work with emulators which supports regular D77/D88 disk images.|
-|`bs2hfe`|Bit-stream data (.raw) to .HFE floppy image format.<br>The .hfe disk image format is used for the [HxC FDD emulator device](https://hxc2001.com/download/floppy_drive_emulator/).|
+|[`bs2hfe`](./docs/bs2hfe.md)|Bit-stream data (.raw) to .HFE floppy image format.<br>The .hfe disk image format is used for the [HxC FDD emulator device](https://hxc2001.com/download/floppy_drive_emulator/).|
 |[`bs_inspect.py`](./docs/bs_inspect.md)|Data inspection/analyze tool for bit-stream data|
 |[`d77_inspect.py`](./docs/d77_inspect.md)|Data inspection/analyze tool for D77/D88 disk image data|
 |`floppylib.py`|A library which provides fundamental floppy disk functions.<br> This library is including data-separator, digital VFO, MFM decoder and IBM format parser|
