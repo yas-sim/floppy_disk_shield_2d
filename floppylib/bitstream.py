@@ -47,6 +47,36 @@ class bitstream:
                 elif line[0]=='~':         # the data lines must start with '~'
                     linebuf += line[1:]
 
+    def read_dist_buf(self, file):
+        self.disk = {}
+        self.spin_spd = 0.2             # default spin speed = 0.2ms = 300rpm
+        dist = 0
+        with open(file, 'r') as f:
+            linebuf = ''
+            for line in f:
+                line = line.rstrip('\n')
+                if len(line)==0:
+                    continue
+                if '**SPIN_SPD'   in line:
+                    self.spin_spd = float(line.split(' ')[1])
+                if '**TRACK_READ' in line:
+                    trk, side = [ int(v) for v in line.split(' ')[1:] ]
+                    linebuf = ''
+                elif '**TRACK_END' in line:
+                    if len(linebuf)==0:
+                        continue
+                    bit_stream = []
+                    # convert linebuf to bit stream
+                    for ch in linebuf:
+                        dist += ord(ch) - ord(' ') - 1
+                        if ch != ord('{'):
+                            bit_stream.append(dist)
+                            dist = 0
+                    key = '{}-{}'.format(trk, side)
+                    self.disk[key] = bit_stream
+                elif line[0]=='~':         # the data lines must start with '~'
+                    linebuf += line[1:]
+
     def display_histogram(self, track, side):
         histo = [ 0 ] * (ord('z')-ord(' ')+1)
         key = '{}-{}'.format(track, side)

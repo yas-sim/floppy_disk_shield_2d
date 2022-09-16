@@ -40,17 +40,10 @@ inline enum FDD::ENUM_DRV_MODE FDD::get_media_type(void) {
 }
 
 inline void FDD::step1(void) {
-#if 0
-    digitalWrite(FD_STEP, LOW);
-    delay(STEP_RATE/2);
-    digitalWrite(FD_STEP, HIGH);
-    delay(STEP_RATE/2);
-#else
     digitalWrite(FD_STEP, LOW);
     delayMicroseconds(1);
     digitalWrite(FD_STEP, HIGH);
     delay(STEP_RATE);
-#endif
 }
 
 void FDD::step(void) {
@@ -88,17 +81,9 @@ void FDD::track00(void) {
   while (readTRK00() == HIGH) {
     stepOut();
   }
-#if 0
-  if (drive_type == 1) {
-    stepIn();   // 2DD/2HD
-  }
-#endif
 }
 
 inline void FDD::waitIndex(void) {      // wait for the index hole detection
-//      while (readIndex() == LOW);
-//      delay(10);
-//      while (readIndex() == HIGH);
     int curr = HIGH;
     int prev = readIndex();
     while(true) {
@@ -165,6 +150,7 @@ void FDD::detect_drive_type(void) {
 
 float FDD::measure_rpm() {
 #if defined(__AVR_ATmega328P__)
+  noInterrupts();
   uint8_t TCCR1A_bkup = TCCR1A;
   TCCR1A = TCCR1A & 0xfc;   // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
 
@@ -173,6 +159,7 @@ float FDD::measure_rpm() {
   tcnt1_ = TCNT1;
   waitIndex();
   tcnt1 = TCNT1;
+  interrupts();
   tcnt1 = tcnt1 > tcnt1_ ? tcnt1 - tcnt1_ : tcnt1 - tcnt1_ + 65535;
   float spin = tcnt1 / 250e3;
 

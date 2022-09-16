@@ -1,4 +1,4 @@
-d77inspect.py
+# d77inspect.py
 
 ```sh
 python d77inspect.py -i gutchan_bank.d77 -t 0

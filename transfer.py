@@ -86,11 +86,11 @@ if __name__ == '__main__':
     print('** Floppy shield - data transfer tool')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--output', type=str, required=False, default=None, help='output raw bit stream file name (Default = fdshield_(DATE-TIME).raw)')
+    parser.add_argument('-o', '--output', type=str, required=True, default=None, help='output raw bit stream file name (Default = fdshield_(DATE-TIME).raw)')
     parser.add_argument('--start_track', type=int, required=False, default=-1, help='start track number')
     parser.add_argument('--end_track', type=int, required=False, default=-1, help='end track number')
     parser.add_argument('--media_type', type=str, required=False, default="2D", help='media type (2D, 2DD or 2HD)')
-    parser.add_argument('--read_overlap', type=int, required=False, default=0, help='track read 2nd lap overlap percentage (default = 0 %)')
+    parser.add_argument('--read_overlap', type=int, required=False, default=0, help='track read 2nd lap overlap percentage (default = 0 percent)')
     args = parser.parse_args()
 
     main(args)
