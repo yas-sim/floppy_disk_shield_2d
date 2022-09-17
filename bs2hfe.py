@@ -57,7 +57,7 @@ def main(args):
     track_data_offset = 2       # 0x200 unit. startng from 0x400 (==2)
     # Multiplex side 0 and side 1 data to generate HFE track data
     hfe_track_bufs = []
-    hfe_track_table = bytearray([0] * 80 * 2)
+    hfe_track_table = bytearray([0] * 80 * 4)
     hfe_blk_size = 0x100
     offset_list = []
     for track_n in range(len(mfm_track_bufs) // 2):
