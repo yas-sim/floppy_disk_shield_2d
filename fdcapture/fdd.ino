@@ -1,6 +1,6 @@
 #include "fdd.h"
 
-FDD::FDD() : drive_type(0), media_type(0) {}
+FDD::FDD() : drive_type(0), media_type(0), write_gate_safeguard(false) {}
 
 void FDD::init( void ) {
   pinMode(FD_HEAD_LOAD, OUTPUT);  // Head Load     L=contact
@@ -143,6 +143,24 @@ void FDD::detect_drive_type(void) {
     set_drive_type(ENUM_DRV_MODE::mode_2dd);
     Serial.println(F("2DD"));
   }
+}
+
+// false = WG disable, true = WG enable
+inline void FDD::writeGate( bool onOff ) {
+  if(onOff == false) {
+    digitalWrite(FD_WG, HIGH);   // WG can disable unconditionally
+    return;
+  }
+  if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
+  digitalWrite(FD_WG, LOW);
+}
+
+inline void FDD::releaseWriteGateSafeguard(void) {
+  write_gate_safeguard = true;
+}
+
+inline void FDD::setWriteGateSafeguard(void) {
+  write_gate_safeguard = false;
 }
 
 // TCNT1 = 250KHz count

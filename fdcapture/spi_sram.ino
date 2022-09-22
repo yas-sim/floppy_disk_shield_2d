@@ -8,6 +8,13 @@ void SPISRAM::init(void) {
   pinMode(SPISRAM_HOLD, OUTPUT);
   //reset();
   setMode();
+  setDefaultValue(0xff);
+  curr_bit_pos = 0;
+  curr_byte = default_val;
+}
+
+void SPISRAM::setDefaultValue( uint8_t val ) {
+  default_val = val;
 }
 
 inline uint8_t SPISRAM::transfer(uint8_t dt) {
@@ -49,6 +56,8 @@ void SPISRAM::beginWrite(void) {
   transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)
   transfer(0x00); // Address 1
   transfer(0x00); // Address 0
+  curr_bit_pos = 0;
+  curr_byte = default_val;
 }
 
 void SPISRAM::beginRead(void) {
@@ -85,7 +94,7 @@ void SPISRAM::fill(byte a) {
   endAccess();
 }
 
-void SPISRAM::SPISRAM::clear(void) {
+void SPISRAM::clear(void) {
   beginWrite();
   for (unsigned long i = 0; i < SPISRAM_CAPACITY_BYTE; i++) {
     transfer(0);
@@ -93,7 +102,7 @@ void SPISRAM::SPISRAM::clear(void) {
   endAccess();
 }
 
-void SPISRAM::SPISRAM::dump(int count) {
+void SPISRAM::dump(int count) {
   beginRead();
   byte dt;
   for (int i = 0; i < count; i++) {
@@ -103,4 +112,19 @@ void SPISRAM::SPISRAM::dump(int count) {
   }
   endAccess();
   Serial.println(F(""));
+}
+
+void SPISRAM::writeBit(uint8_t dt) {
+  uint8_t bit_ptn = 1 << (7 - (curr_bit_pos & 0x07));
+  curr_byte = dt ? curr_byte | bit_ptn : curr_byte & ~bit_ptn;
+  if(++curr_bit_pos & 0x07 == 0x00) {
+    transfer(curr_byte);    // write out a completed byte
+    curr_byte = default_val;
+  }
+}
+
+void SPISRAM::flush(void) {
+  if(curr_bit_pos & 0x07 != 0) {
+    transfer(curr_byte);    // write out the residual bit data
+  }
 }

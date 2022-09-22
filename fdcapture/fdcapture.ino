@@ -13,6 +13,7 @@
 size_t g_spin_ms;         // FDD spin speed (ms)
 
 // GPIO mapping
+#define FD_WG         (A5)   // Write gate signal !!DANGER!!
 #define SPISRAM_HOLD  (A4)
 #define FD_TRK00      (A3)
 #define FD_READY      (A2)
@@ -30,6 +31,16 @@ size_t g_spin_ms;         // FDD spin speed (ms)
 #define CAP_RST       (4)
 #define CAP_EN        (3)
 #define FD_WP         (2)
+
+void debug_blink(void)
+{
+  while(true) {
+    digitalWrite(CAP_ACTIVE, HIGH);
+    delay(300);
+    digitalWrite(CAP_ACTIVE, LOW);
+    delay(300);
+  }
+}
 
 // Objects
 FDD fdd;
@@ -231,6 +242,91 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 }
 
 
+
+// Write single track
+void trackWrite(unsigned long long bits_to_write) {
+  spisram.beginRead();
+  spisram.hold(LOW);
+  spisram.disconnect();           // Disconnect SPI SRAM from Arduino
+
+  fdd.releaseWriteGateSafeguard(); // Release write gate safeguard
+  fdd.waitIndex();
+
+  // Start writing
+  spisram.hold(HIGH);
+  fdd.writeGate(true);            // Enable WG
+  FDCap.enable();
+  delay(g_spin_ms / 10);          // wait for 10% of spin
+
+  fdd.waitIndex();
+  fdd.writeGate(false);           // Disable WG right after the next index hole detection
+
+  digitalWrite(SPI_SS, HIGH);
+  FDCap.disable();
+  spisram.connect();
+  spisram.endAccess();
+  fdd.setWriteGateSafeguard();
+}
+
+// Write tracks
+void write_tracks(void) {
+  byte cmdBuf[cmdBufSize+1];
+  bool cmdFlag = false;
+  fdd.track00();
+  int curr_trk = 0;
+  int trk, sid;
+  uint8_t mode = 0;   // Command mode
+  uint16_t dist = 0;    // data pulse distance
+  uint32_t curr_bit_pos;
+  uint8_t curr_byte;
+
+  do {
+    readLine(cmdBuf, cmdBufSize);
+    byte cmdLen = strlen(cmdBuf);
+    if(mode == 1 && cmdBuf[0] == '~') {                // Pulse data line
+      for(int i=1; i<cmdLen; i++) {
+        dist += cmdBuf[i] - ' ';
+        if(cmdBuf[i] != '{') {                         // not an extend char
+          for(int j = 0; j < dist - 1; j++) {
+            spisram.writeBit(1);
+          }
+          spisram.writeBit(0);
+          dist = 0;
+        }
+      }
+      continue;
+    }
+    //if(cmdBuf[0] != '*' || cmdBuf[1] != '*') continue;
+    if(cmdBuf[2] == 'T' && cmdBuf[8] == 'R') {        // **TRACK_READ 0 0
+      sscanf(cmdBuf+12, "%d %d", &trk, &sid);
+      mode = 1;   // Read track data mode
+      spisram.fill(0xff);
+      spisram.beginWrite();
+      curr_bit_pos = 0;
+      curr_byte = 0xff;
+      continue;
+    } else if(cmdBuf[2] == 'T' && cmdBuf[8] == 'E') { // **TRACK_END
+      spisram.flush();
+      spisram.endAccess();
+      fdd.seek(curr_trk, trk);
+      fdd.side(sid);
+      curr_trk = trk;
+      unsigned long long bits = spisram.getLength();
+      trackWrite(bits);
+      Serial.println(F("++WRITE_COMPLETED"));
+      Serial.flush();
+      mode = 0;   // Command mode
+      continue;
+    } else if(cmdBuf[2] == 'M' && cmdBuf[8] == 'T') { // **MEDIA_TYPE
+    } else if(cmdBuf[2] == 'S' && cmdBuf[7] == 'S') { // **SPIN_SPD 0.199
+    } else if(cmdBuf[2] == 'O' && cmdBuf[6] == 'L') { // **OVERLAP 0
+    }
+  } while(cmdBuf[2] != 'C');                          // **COMPLETED
+}
+
+
+// =================================================================
+
 // Memory test
 void memory_test(void) {
   static int c = 0;
@@ -254,13 +350,11 @@ void timing_light(int freq) {
 }
 
 
-#define cmdBufSize (20)
-
 void readLine(byte buf[], const size_t buf_size) {
   byte ch;
   size_t pos = 0;
   buf[0] = '\0';
-  while(pos<buf_size) {
+  while(pos<buf_size-1) {
     while(Serial.available()==0);
     ch = Serial.read();
     if(ch == '\n') break;
@@ -337,6 +431,16 @@ void loop() {
     read_tracks(start_track, end_track, read_overlap);
 
     Serial.println(F("**COMPLETED"));
+  }
+  // WRITE command needs to be 'WR' not 'W'.
+  if(cmd == 'W') {
+    if(cmdBuf[2] != 'R') return;
+    enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
+    fdd.set_media_type(media_mode);
+    // Detect FDD type (2D/2DD)
+    fdd.detect_drive_type();
+    Serial.println(F("++READY"));
+    write_tracks();
   }
   if(cmd == 'T') {
     int freq;

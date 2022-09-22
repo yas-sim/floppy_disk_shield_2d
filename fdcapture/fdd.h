@@ -8,6 +8,7 @@ class FDD {
   private:
     int drive_type;     // 0=2D, 1=2DD/2HD
     int media_type;     // 0=2D, 1=2DD/2HD
+    bool write_gate_safeguard;
   public:
     FDD();
 
@@ -43,6 +44,11 @@ class FDD {
     void head(bool onoff);
     void detect_drive_type(void);
     float measure_rpm();
+
+    // FDD write gate control functions !! DANGER !!
+    inline void writeGate(bool onOff);
+    inline void setWriteGateSafeguard(void);
+    inline void releaseWriteGateSafeguard(void);
 };
 
 #endif

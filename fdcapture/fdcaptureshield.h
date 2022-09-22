@@ -10,4 +10,6 @@ class FDCaptureShield {
     inline void disable(void);
 }; 
 
+#define cmdBufSize (110)
+
 #endif
