@@ -10,6 +10,8 @@
 #include "spi_sram.h"
 #include "fdcaptureshield.h"
 
+uint8_t cmdBuf[cmdBufSize+1];
+  
 size_t g_spin_ms;         // FDD spin speed (ms)
 
 // GPIO mapping
@@ -48,37 +50,6 @@ SPISRAM spisram;
 FDCaptureShield FDCap;
 
 const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
-
-void dumpTrack_bit(unsigned long bytes = 0UL) {
-  spisram.beginRead();
-
-  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
-  for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = spisram.transfer(0);
-    print8BIN(dt);
-    //Serial.print(F(" "));
-  }
-  Serial.println(F(" "));
-  spisram.endAccess();
-}
-
-
-void dumpTrack_hex(unsigned long bytes = 0UL) {
-
-  Serial.println(F("**TRACK_DUMP_START"));
-  spisram.beginRead();
-
-  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
-  for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = spisram.transfer(0);
-    printHex(dt);
-    if (i % 64 == 63) {
-      Serial.println(F(""));
-    }
-  }
-  spisram.endAccess();
-  Serial.println(F("**TRACK_DUMP_END"));
-}
 
 
 void dumpTrack_encode(unsigned long bytes = 0UL) {
@@ -134,48 +105,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
 }
 
 
-void histogram(unsigned long bytes = 0UL) {
-  unsigned int histo[10];
-  for (int i = 0; i < 10; i++) histo[i] = 0UL;
-
-  spisram.beginRead();
-
-  if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
-
-  int prev = 0;
-  int count = 1;
-  for (unsigned long i = 0; i < bytes; i++) {
-    byte dt = spisram.transfer(0);
-    for (int j = 0; j < 8; j++) {
-      int b = (dt & 0x80) == 0x80 ? 1 : 0;
-      dt <<= 1;
-      if (b == prev) {
-        count++;
-      } else {
-        prev = b;
-        histo[count]++;
-        count = 1;
-      }
-    }
-  }
-  spisram.endAccess();
-
-  for (int i = 0; i < 10; i++) {
-    Serial.print(i);
-    Serial.print(F(" : "));
-    Serial.println(histo[i]);
-  }
-}
-
-
-// Calibrate motor speed
-void revolution_calibration(void) {
-  float spin;
-  while (1) {
-    spin = fdd.measure_rpm();
-    Serial.println(spin * 1000, DEC); // ms
-  }
-}
+// =================================================================
 
 
 // Read single track
@@ -233,18 +163,18 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 
     trackRead(read_overlap);
 
-    dumpTrack_encode(capture_capacity_byte);
+    dumpTrack_encode(capture_capacity_byte);    // Dump captured data
     //dumpTrack_encode(TRACK_CAPACITY_BYTE);    // SPI SRAM full dump
     Serial.println(F("**TRACK_END"));
   }
-  //dumpTrack_hex(TRACK_CAPACITY_BYTE);
-  //dumpTrack_bit(10);
 }
 
 
+// =================================================================
+
 
 // Write single track
-void trackWrite(unsigned long long bits_to_write) {
+void trackWrite(uint32_t bits_to_write) {
   spisram.beginRead();
   spisram.hold(LOW);
   spisram.disconnect();           // Disconnect SPI SRAM from Arduino
@@ -270,97 +200,97 @@ void trackWrite(unsigned long long bits_to_write) {
 
 // Write tracks
 void write_tracks(void) {
-  byte cmdBuf[cmdBufSize+1];
-  bool cmdFlag = false;
+  const byte encode_base = ' ';
+  const byte max_length = 'z'-encode_base;
+  const byte extend_char = '{';
+  const uint8_t bit_cell      = 8;
+  const uint8_t bit_cell_half = bit_cell / 2;
+
   fdd.track00();
   int curr_trk = 0;
   int trk, sid;
-  uint8_t mode = 0;   // Command mode
-  uint16_t dist = 0;    // data pulse distance
-  uint32_t curr_bit_pos;
-  uint8_t curr_byte;
+  uint8_t test = 0;
 
+  uint8_t mode = 0;     // Command mode
+  uint8_t dist = 0;    // data pulse distance
+  uint8_t bit_dt = 0;
+  Serial.println(F("++READY"));
   do {
     readLine(cmdBuf, cmdBufSize);
-    byte cmdLen = strlen(cmdBuf);
-    if(mode == 1 && cmdBuf[0] == '~') {                // Pulse data line
-      for(int i=1; i<cmdLen; i++) {
-        dist += cmdBuf[i] - ' ';
-        if(cmdBuf[i] != '{') {                         // not an extend char
-          for(int j = 0; j < dist - 1; j++) {
-            spisram.writeBit(1);
+    uint8_t cmdLen = strlen(cmdBuf);
+    if(cmdLen > cmdBufSize) cmdLen = cmdBufSize;
+    if(cmdBuf[0] == '*' && cmdBuf[1] == '*') {          // CMD
+      if(cmdBuf[2] == 'T' && cmdBuf[8] == 'R') {        // **TRACK_READ 0 0
+        mode = 1;   // Read track data mode
+        sscanf(cmdBuf+12, "%d %d", &trk, &sid);
+        fdd.seek(curr_trk, trk);
+        fdd.side(sid);
+        curr_trk = trk;
+        spisram.fill(0xff);
+        spisram.beginWrite();
+      } else if(cmdBuf[2] == 'T' && cmdBuf[8] == 'E') { // **TRACK_END
+        mode = 0;   // Command mode
+        spisram.flush();
+        spisram.endAccess();
+        uint32_t bits = spisram.getLength();
+        trackWrite(bits);
+      } else if(cmdBuf[2] == 'M' && cmdBuf[8] == 'T') { // **MEDIA_TYPE
+      } else if(cmdBuf[2] == 'S' && cmdBuf[7] == 'S') { // **SPIN_SPD 0.199
+      } else if(cmdBuf[2] == 'O' && cmdBuf[6] == 'L') { // **OVERLAP 0
+      }
+    }
+    if(mode == 1) {
+      if(cmdBuf[0] == '~') {                // Pulse data line
+        for(uint8_t i = 1; i < cmdLen; i++) {
+          dist = cmdBuf[i] - encode_base;
+          if(dist <= bit_cell) {
+            //for(uint8_t b = 0; b < dist; b++) spisram.writeBit(1);    // ignore too close pulse
+          } else {
+            //dist = (dist + bit_cell_half) & (~(bit_cell-1));
+            //dist = (dist+4) & 0x00f8u;
+            bit_dt = (cmdBuf[i] == extend_char) ? 1 : 0;     // if extend, no pulse (1)
+            for(uint8_t b = 0; b < dist - 1; b++) {
+              spisram.writeBit(1);
+            }
+            spisram.writeBit(bit_dt);
           }
-          spisram.writeBit(0);
-          dist = 0;
         }
       }
-      continue;
     }
-    //if(cmdBuf[0] != '*' || cmdBuf[1] != '*') continue;
-    if(cmdBuf[2] == 'T' && cmdBuf[8] == 'R') {        // **TRACK_READ 0 0
-      sscanf(cmdBuf+12, "%d %d", &trk, &sid);
-      mode = 1;   // Read track data mode
-      spisram.fill(0xff);
-      spisram.beginWrite();
-      curr_bit_pos = 0;
-      curr_byte = 0xff;
-      continue;
-    } else if(cmdBuf[2] == 'T' && cmdBuf[8] == 'E') { // **TRACK_END
-      spisram.flush();
-      spisram.endAccess();
-      fdd.seek(curr_trk, trk);
-      fdd.side(sid);
-      curr_trk = trk;
-      unsigned long long bits = spisram.getLength();
-      trackWrite(bits);
-      Serial.println(F("++WRITE_COMPLETED"));
-      Serial.flush();
-      mode = 0;   // Command mode
-      continue;
-    } else if(cmdBuf[2] == 'M' && cmdBuf[8] == 'T') { // **MEDIA_TYPE
-    } else if(cmdBuf[2] == 'S' && cmdBuf[7] == 'S') { // **SPIN_SPD 0.199
-    } else if(cmdBuf[2] == 'O' && cmdBuf[6] == 'L') { // **OVERLAP 0
-    }
+    Serial.println("++ACK");
   } while(cmdBuf[2] != 'C');                          // **COMPLETED
+}
+
+// =================================================================
+
+
+// Calibrate motor speed
+void revolution_calibration(void) {
+  float spin;
+  while (1) {
+    spin = fdd.measure_rpm();
+    Serial.println(spin * 1000, DEC); // ms
+  }
 }
 
 
 // =================================================================
 
-// Memory test
-void memory_test(void) {
-  static int c = 0;
-  fdd.waitIndex();
-  spisram.fill(c++);
-  spisram.dump(40);
-  //dumpTrack_bit();
-}
 
-
-// Use access indicator LED as a timing light
-// for FDD revolution adjustment
-void timing_light(int freq) {
-  int period = 1000 / freq;
-  while (1) {
-    digitalWrite(CAP_ACTIVE, HIGH);
-    delay(period * 0.2);
-    digitalWrite(CAP_ACTIVE, LOW);
-    delay(period * 0.8);
-  }
-}
-
-
-void readLine(byte buf[], const size_t buf_size) {
-  byte ch;
-  size_t pos = 0;
+uint8_t readLine(uint8_t buf[], const uint8_t buf_size) {
+  uint8_t ch;
+  uint8_t pos = 0;
   buf[0] = '\0';
-  while(pos<buf_size-1) {
+  while(pos < buf_size) {
+    buf[pos] = '\0';
     while(Serial.available()==0);
     ch = Serial.read();
     if(ch == '\n') break;
-    buf[pos++] = ch;
-    buf[pos] = '\0';
+    if(ch >= ' ' && ch <= 0x7e) {   // stores only readable characters
+      buf[pos++] = ch;
+    }
   }
+  return pos;
 }
 
 
@@ -379,10 +309,8 @@ void setup() {
 
 // Command format
 // "+R strack etrack mode overlap"
-// "+T freq"
 // "+V"
 void loop() {
-  byte cmdBuf[cmdBufSize+1];
   char cmd;
 
   Serial.println("");
@@ -435,51 +363,16 @@ void loop() {
   // WRITE command needs to be 'WR' not 'W'.
   if(cmd == 'W') {
     if(cmdBuf[2] != 'R') return;
-    enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
-    fdd.set_media_type(media_mode);
     // Detect FDD type (2D/2DD)
     fdd.detect_drive_type();
-    Serial.println(F("++READY"));
+    enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
+    fdd.set_media_type(media_mode);
     write_tracks();
-  }
-  if(cmd == 'T') {
-    int freq;
-    sscanf(cmdBuf, "+%c %d", &cmd, &freq);
-    Serial.println(F("**Timing light mode"));
-    timing_light(freq);
   }
   if(cmd == 'V') {
     Serial.println(F("**Revolution calibration mode"));
     revolution_calibration();
   }
-  if(cmd == 'S') {
-    Serial.println(F("**Seek mode"));
-    int current_track = 0, target_track, side, val;
-    fdd.track00();
-    while(true) {
-      readLine(cmdBuf, cmdBufSize);
-      sscanf(cmdBuf, "%d", &val);
-      if(val==0) {
-        Serial.println(F("TRK00"));
-        fdd.track00();
-        target_track = 0;
-        side = 0;
-      } else {
-        side         = val % 2;
-        target_track = val / 2;
-        fdd.seek(current_track, target_track);
-      }
-      fdd.side(side);
-      Serial.print(target_track);
-      Serial.print(" ");
-      Serial.println(side);
-      current_track = target_track;
-    }
-  }
-
   fdd.head(false);
   fdd.motor(false);
-
-  // Halt
-  //while (true) delay(100);
 }

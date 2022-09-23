@@ -3,6 +3,8 @@
 FDD::FDD() : drive_type(0), media_type(0), write_gate_safeguard(false) {}
 
 void FDD::init( void ) {
+  digitalWrite(FD_WG, HIGH);
+  pinMode(FD_WG,        OUTPUT);  // Write gate
   pinMode(FD_HEAD_LOAD, OUTPUT);  // Head Load     L=contact
   pinMode(FD_MOTOR,     OUTPUT);  // Motor         L=ON
   pinMode(FD_DIR,       OUTPUT);  // DIR           L=inside(trk+), H=outside (trk-)
@@ -151,7 +153,7 @@ inline void FDD::writeGate( bool onOff ) {
     digitalWrite(FD_WG, HIGH);   // WG can disable unconditionally
     return;
   }
-  if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
+  //if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
   digitalWrite(FD_WG, LOW);
 }
 

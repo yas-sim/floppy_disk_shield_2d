@@ -15,13 +15,20 @@ def detect_arduino():
             aport = info.device
     return aport
 
-def wait_response(uart, expected_response):
+def wait_response(uart, expected_response, verbose=False):
+    count = 0
     while True:         # wait for prompt from Arduino
-        line = uart.readline().rstrip(b'\n').rstrip(b'\r')
-        if len(line)==0:
-            continue
+        line = uart.readline() #.rstrip(b'\n').rstrip(b'\r')
+        #if len(line)==0:
+        #    continue
+        if verbose:
+            print(line)
         line = line.decode(encoding='ascii', errors='ignore')
         if line[:len(expected_response)] == expected_response:
+            break
+        count += 1
+        if count >= 3:
+            print('_TO_', end='', flush=True)
             break
 
 
@@ -35,7 +42,7 @@ def main(args):
     else:
         print('Arduino is found on "{}"'.format(arduino_port))
     try:
-        uart = serial.Serial(arduino_port, baudrate=115200, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+        uart = serial.Serial(arduino_port, baudrate=115200, timeout=3, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
     except serial.serialutil.SerialException:
         print('ERROR : ' + arduino_port + ' is in use.')
         sys.exit(1)
@@ -44,14 +51,13 @@ def main(args):
 
     wait_response(uart, '++CMD')   # wait for prompt from Arduino
 
-    mode = 0            # 0: cmd mode, 1: pulse data read mode
     uart.write('+WR \n'.encode('ascii'));
-
     wait_response(uart, '++READY')
 
+    mode = 0            # 0: cmd mode, 1: pulse data read mode
     with open(args.input, 'rt') as f:
         while exit_flag == False:
-            line = f.readline().rstrip('\n').rstrip('\r')
+            line = f.readline()#.rstrip('\n').rstrip('\r')
             if len(line)==0:
                 continue
             items = line.split()
@@ -72,25 +78,31 @@ def main(args):
                 curr_track = int(items[1])
                 curr_side = int(items[2])
                 print(f'** TRACK WRITE {curr_track} {curr_side}')
-                uart.write((line + '\n').encode('ascii'))
+                uart.write((line).encode('ascii'))
+                uart.flush()
                 mode = 1                        # read pulse data mode
+                wait_response(uart, '++ACK')
             elif line[:11] == '**TRACK_END':
                 print('\nWRITING...')
-                uart.write((line + '\n').encode('ascii'))
-                wait_response(uart, '++WRITE_COMPLETED')
+                uart.write((line).encode('ascii'))
+                uart.flush()
                 mode = 0
+                wait_response(uart, '++ACK')
             elif line[:11] == '**COMPLETED':
-                uart.write((line + '\n').encode('ascii'))
+                uart.write((line).encode('ascii'))
+                uart.flush()
                 exit_flag = True
+                wait_response(uart, '++ACK')
             elif mode == 1:
                 if line[0] != '~':
-                    print(line)
-                    print('#', end='', flush=True)
                     continue
                 print('.', end='', flush=True)
-                uart.write((line + '\n').encode('ascii'))
+                uart.write((line).encode('ascii'))
+                uart.flush()
+                wait_response(uart, '++ACK')
 
     uart.close()
+
 
 if __name__ == '__main__':
     print('** Floppy shield - disk cloning tool')

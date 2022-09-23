@@ -5,9 +5,10 @@ class SPISRAM {
   public:
     const uint32_t SPI_CLK = 4e6;
     const uint32_t SPISRAM_CAPACITY_BYTE = 2 * 65536UL; // 1Mbit SRAM (bytes)
-    uint32_t curr_bit_pos;
+    uint8_t curr_bit_ptn;
     uint8_t curr_byte;
     uint8_t default_val;   // default value for the curr_byte
+    uint32_t write_count;  // byte unit
     SPISRAM();
 
     void init(void);
@@ -15,7 +16,7 @@ class SPISRAM {
     inline uint8_t transfer(uint8_t dt);
     void writeBit(uint8_t dt);
     void flush(void);
-    inline uint32_t getLength( void ) { return curr_bit_pos; }
+    inline uint32_t getLength( void ) { return 0; }
     inline void hold(uint8_t state);
     void reset(void);
     inline void beginAccess(void);
@@ -25,7 +26,7 @@ class SPISRAM {
     void beginRead(void);
     void disconnect(void);
     void connect(void);
-    void fill(byte a);
+    void fill(uint8_t a);
     void clear(void);
     void dump(int count);
 };

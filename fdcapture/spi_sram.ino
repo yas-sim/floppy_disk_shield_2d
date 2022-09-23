@@ -9,8 +9,9 @@ void SPISRAM::init(void) {
   //reset();
   setMode();
   setDefaultValue(0xff);
-  curr_bit_pos = 0;
+  curr_bit_ptn = 0x80;
   curr_byte = default_val;
+  write_count = 0;
 }
 
 void SPISRAM::setDefaultValue( uint8_t val ) {
@@ -56,7 +57,7 @@ void SPISRAM::beginWrite(void) {
   transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)
   transfer(0x00); // Address 1
   transfer(0x00); // Address 0
-  curr_bit_pos = 0;
+  curr_bit_ptn = 0x80;
   curr_byte = default_val;
 }
 
@@ -86,7 +87,7 @@ void SPISRAM::connect(void) {
   SPCR |= 0x40;    // SPE=1, SPI I/F enable
 }
 
-void SPISRAM::fill(byte a) {
+void SPISRAM::fill(uint8_t a) {
   beginWrite();
   for (unsigned long i = 0; i < SPISRAM_CAPACITY_BYTE; i++) {
     transfer(a + i);
@@ -115,16 +116,17 @@ void SPISRAM::dump(int count) {
 }
 
 void SPISRAM::writeBit(uint8_t dt) {
-  uint8_t bit_ptn = 1 << (7 - (curr_bit_pos & 0x07));
-  curr_byte = dt ? curr_byte | bit_ptn : curr_byte & ~bit_ptn;
-  if(++curr_bit_pos & 0x07 == 0x00) {
+  curr_byte = dt ? (curr_byte | curr_bit_ptn) : (curr_byte & ~curr_bit_ptn);
+  curr_bit_ptn >>= 1;
+  if(curr_bit_ptn == 0x00) {
     transfer(curr_byte);    // write out a completed byte
+    curr_bit_ptn = 0x80;
     curr_byte = default_val;
   }
 }
 
 void SPISRAM::flush(void) {
-  if(curr_bit_pos & 0x07 != 0) {
+  if(curr_bit_ptn != 0x80) {
     transfer(curr_byte);    // write out the residual bit data
   }
 }
