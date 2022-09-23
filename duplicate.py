@@ -15,7 +15,10 @@ def detect_arduino():
             aport = info.device
     return aport
 
+last_line = ''
+
 def wait_response(uart, expected_response, verbose=False):
+    global last_line
     count = 0
     while True:         # wait for prompt from Arduino
         line = uart.readline() #.rstrip(b'\n').rstrip(b'\r')
@@ -27,12 +30,14 @@ def wait_response(uart, expected_response, verbose=False):
         if line[:len(expected_response)] == expected_response:
             break
         count += 1
-        if count >= 3:
-            print('_TO_', end='', flush=True)
+        if count >= 5:
+            print(last_line)
+            #print('_TO_', end='', flush=True)
             break
 
 
 def main(args):
+    global last_line
     # Search an Arduino and open UART
     print('Searching for Arduino')
     arduino_port = detect_arduino()
@@ -97,6 +102,8 @@ def main(args):
                 if line[0] != '~':
                     continue
                 print('.', end='', flush=True)
+                line = line.replace('C', 'B')              # !?!? Mystery. When the line including 'C', Arduino gets hang up.
+                last_line = line
                 uart.write((line).encode('ascii'))
                 uart.flush()
                 wait_response(uart, '++ACK')

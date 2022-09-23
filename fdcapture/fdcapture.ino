@@ -65,9 +65,9 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   byte out;
   for (unsigned long i = 0; i < bytes; i++) {
     int dt = spisram.transfer(0);
-    const byte encode_base = ' ';
-    const byte max_length = 'z'-encode_base;
-    const byte extend_char = '{';
+    const uint8_t encode_base = ' ';
+    const uint8_t max_length = 'z'-encode_base;
+    const uint8_t extend_char = '{';
     for (int p = 0; p < 8; p++) {
       b = (dt & 0x80u) ? 1 : 0;
       dt <<= 1;
@@ -200,9 +200,9 @@ void trackWrite(uint32_t bits_to_write) {
 
 // Write tracks
 void write_tracks(void) {
-  const byte encode_base = ' ';
-  const byte max_length = 'z'-encode_base;
-  const byte extend_char = '{';
+  const uint8_t encode_base = ' ';
+  const uint8_t max_length = 'z'-encode_base;
+  const uint8_t extend_char = '{';
   const uint8_t bit_cell      = 8;
   const uint8_t bit_cell_half = bit_cell / 2;
 
@@ -215,7 +215,7 @@ void write_tracks(void) {
   uint8_t dist = 0;    // data pulse distance
   uint8_t bit_dt = 0;
   Serial.println(F("++READY"));
-  do {
+  while(true) {
     readLine(cmdBuf, cmdBufSize);
     uint8_t cmdLen = strlen(cmdBuf);
     if(cmdLen > cmdBufSize) cmdLen = cmdBufSize;
@@ -237,28 +237,34 @@ void write_tracks(void) {
       } else if(cmdBuf[2] == 'M' && cmdBuf[8] == 'T') { // **MEDIA_TYPE
       } else if(cmdBuf[2] == 'S' && cmdBuf[7] == 'S') { // **SPIN_SPD 0.199
       } else if(cmdBuf[2] == 'O' && cmdBuf[6] == 'L') { // **OVERLAP 0
+      } else if(cmdBuf[2] == 'C' && cmdBuf[7] == 'E') { // **COMPLETED
+        break;
       }
     }
     if(mode == 1) {
       if(cmdBuf[0] == '~') {                // Pulse data line
-        for(uint8_t i = 1; i < cmdLen; i++) {
+        for(uint8_t i = 1; i < cmdLen; i++) {   // skip '~' on the top of the line
+          if(cmdBuf[i] < ' ') continue;
           dist = cmdBuf[i] - encode_base;
-          if(dist <= bit_cell) {
-            //for(uint8_t b = 0; b < dist; b++) spisram.writeBit(1);    // ignore too close pulse
-          } else {
+          if(dist >= 1) {
             //dist = (dist + bit_cell_half) & (~(bit_cell-1));
             //dist = (dist+4) & 0x00f8u;
-            bit_dt = (cmdBuf[i] == extend_char) ? 1 : 0;     // if extend, no pulse (1)
-            for(uint8_t b = 0; b < dist - 1; b++) {
-              spisram.writeBit(1);
+            if(cmdBuf[i] != extend_char && dist <= max_length) {
+              for(uint8_t b = 0; b < dist - 1; b++) {
+                spisram.writeBit(1);
+              }
+              spisram.writeBit(bit_dt);         // make a pulse
+            } else {
+              for(uint8_t b = 0; b < max_length; b++) {
+                spisram.writeBit(1);            // don't make pulse
+              }
             }
-            spisram.writeBit(bit_dt);
           }
         }
       }
     }
     Serial.println("++ACK");
-  } while(cmdBuf[2] != 'C');                          // **COMPLETED
+  };
 }
 
 // =================================================================
@@ -273,6 +279,17 @@ void revolution_calibration(void) {
   }
 }
 
+// Measure FDD spindle speed (measure time for 5 spins)
+void report_spindle_speed(void) {
+    float spin = 0.f;
+    for(int i=0; i<5; i++) {
+      spin += fdd.measure_rpm();
+    }
+    spin /= 5;
+    Serial.print(F("**SPIN_SPD "));
+    Serial.println(spin,8);
+    g_spin_ms = (int)(spin*1000);
+}
 
 // =================================================================
 
@@ -334,15 +351,7 @@ void loop() {
     fdd.detect_drive_type();
     fdd.track00();
 
-    // Measure FDD spindle speed (measure time for 5 spins)
-    float spin = 0.f;
-    for(int i=0; i<5; i++) {
-      spin += fdd.measure_rpm();
-    }
-    spin /= 5;
-    Serial.print(F("**SPIN_SPD "));
-    Serial.println(spin,8);
-    g_spin_ms = (int)(spin*1000);
+    report_spindle_speed();
 
     int max_capture_time_ms = (int)(((spisram.SPISRAM_CAPACITY_BYTE*8.f) / spisram.SPI_CLK)*1000.f);
     int capture_time_ms     = (int)(g_spin_ms * (1.f + read_overlap/100.f));

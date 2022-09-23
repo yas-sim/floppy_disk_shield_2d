@@ -7,6 +7,9 @@
 - The magnetic flux power on the old floppy disks are dropping and getting weak as time passes. Read-out data integrity with this system is not guaranteed.
 - Recommended to use newer FDD. The old FDD may have problems on the magnetic head such as contamination, worn out or mechanical misalignment.
 
+## Announcement  
+23-Sep 2022 : Image write back to FD is supported. Use `duplicate.py` to write the `*.raw` floppy image data to a floopy disk. Arduino firmware update and closing `JP5` on the fd-capture shield are required to enable the feature.イメージの書き戻しもできるようになりました。Arduinoファームウエアの更新と`JP5`ジャンパーのショートをすると書き込みができるようになります。   
+
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
 The system can preserve entire floppy disk data regardless whether it's normal or not. That means the system can read and preserve copy protect information in the bit-stream file as it is.  
@@ -32,7 +35,8 @@ The system consists of the hardware and software:
 |Name|Description|
 |:--------|:-----------|
 |[`fdcapture.ino`](./docs/fdcapture_ino.md)|Arduino firmware (sketch) for the floppy shield<br> (`./fdcapture/fdcapture.ino`)|
-|[`transfer.py`](./docs/transfer.md)|Transfers raw bitstream data from Arduino to a PC|
+|[`capture.py`](./docs/capture.md)|Floppy image capture tool (FD->image).<br>Transfers raw bitstream data from Arduino to a PC (foremerly, `transfer.py`)|
+|[`duplicate.py`](./docs/duplicate.md)|Floppy image write back tool (image->FD).<br>Transfers raw bitstream data from a PC to Arduino. Close '`JP5`' jumper pad on the FD capture shield to enable the write feature.|
 |[`bs2d77.py`](./docs/bs2d77.md)|Bit-stream data (.raw) to emulator disk image (D77/D88) converter.<br> The program generates modified D77 image data (D77mod). D77mod specification is [here](docs/D77mod_format.md). The D77mod uses some reserved bytes in the header but it is designed to keep backward compatibility with the standard D77 disk images. The D77mod image should work with emulators which supports regular D77/D88 disk images.|
 |[`bs2hfe`](./docs/bs2hfe.md)|Bit-stream data (.raw) to .HFE floppy image format.<br>The .hfe disk image format is used for the [HxC FDD emulator device](https://hxc2001.com/download/floppy_drive_emulator/).|
 |[`bs_inspect.py`](./docs/bs_inspect.md)|Data inspection/analyze tool for bit-stream data|
@@ -46,8 +50,9 @@ The system consists of the hardware and software:
 ### Updates  
 |Date|Description|
 |-|-|
-|Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
+|Sep 2022|Added support for the image write back feature (image->fd). Arduino firmware update and closing `JP5` on the fd-capture shield are required to enable the feature.|
 |Sep 2022|Added RAW to HFE file converter (bs2hfe.py)|
+|Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
 
 ## fdc_bitstream  
 The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project that provides a bit-accurate C++ software FDC library. The fdc_bitstream project includes a disk image converter and image analyzer. Those software are written in C++, so they are faster than the converters in this project. Also, they are developed recently and have better algorithms for format conversion.  Please try `image_converter` in the `fdc_bitstream` project as well.  
@@ -95,7 +100,7 @@ You can check the pulse pitch fluctuation throughout a track with the pulse pitc
 
 ---------
 
-## How to use - 使い方
+## How to use (Image capture) - 使い方
 
 1. Build Floppy shield for Arduino UNO - シールド製作  
 - PCB design files can be found in the `./kicad` directory
@@ -109,9 +114,9 @@ Use `fdcapture.ino`
 - Insert a 2D floppy disk to the floppy disk drive (FDD)
 - Run following command on the Windows PC:
 ```sh
-python transfer.py -o image_name.raw --read_overlap 5 [--media_type 2D|2DD]
+python capture.py -o image_name.raw --read_overlap 5 [--media_type 2D|2DD]
 ```
-- `transfer.py` will search COM port for Arduino UNO and use it.  
+- `capture.py` will search COM port for Arduino UNO and use it.  
 - `--read_overlap` option specifies how much data to read on the 2nd lap in percent.  
 - `--media_type` option specifies the media type to read. `2D` or `2DD` are available.  
 Note: The `fdcapture.ino` can identify the drive type (2D or 2DD) but not the media type.    
@@ -122,6 +127,14 @@ python bs2d77.py -i image_name.raw --abort_id
 - `image_name.d77` will be generated.  
 **Note:** The `--abort_id` option enables abort reading track image when the same sector ID is detected. The FD-shield can read the top of the 2nd lap with `--read_overlap` option. This overlapped track data may contain the same sector data twice. This option will prevent from generating the same sector in a track.  
 
+## Image write back (cloning)  
+1. Setup the system as the same as image captureing.  
+	- The same `fdcapture.ino` firmware works for both `capture.py' and 'duplicate.y' but updating to the latest firmware is required. Use Arduino IDE to update the firmware (Arduino program).    
+	- Close `JP5` jumper pad on the fd-capture shield.  
+2. Run '`duplicate.py`' to write back a '`*.raw`' floppy image to a floppy disk.  
+```sh
+python duplicate.py -i disk_image.raw
+```
 
 ## Accessory Tools  
 1. FDD spindle motor speed calibration tool  
@@ -135,6 +148,7 @@ This tool measures the index hole to index hole time and show it on the screen. 
 ## Current Development Status
 **Done:**
 - Read floppy disk images (2D disk on 2D drive, 2DD disk on 2D deive, 2D disk on 2DD/2HD drive)
+- Write floppy disk image to floppy disk (2D is confirmed)
 - Drive type auto datection (2D or 2DD/2HD)
 - Drive spindle revolution measurement 
 - Generates D77mod disk images from the raw bitstream data (RAW->D77)
