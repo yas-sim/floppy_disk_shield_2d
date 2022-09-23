@@ -8,7 +8,8 @@
 - Recommended to use newer FDD. The old FDD may have problems on the magnetic head such as contamination, worn out or mechanical misalignment.
 
 ## Announcement  
-23-Sep 2022 : Image write back to FD is supported. Use `duplicate.py` to write the `*.raw` floppy image data to a floopy disk. Arduino firmware update and closing `JP5` on the fd-capture shield are required to enable the feature.イメージの書き戻しもできるようになりました。Arduinoファームウエアの更新と`JP5`ジャンパーのショートをすると書き込みができるようになります。   
+23-Sep 2022 : Preview release - Feature to write back the floppy images to FD is supported. Use `duplicate.py` to write the `*.raw` floppy image data to a floopy disk. Arduino firmware update and closing `JP5` on the fd-capture shield are required to enable the feature.
+23-Sep 2022 : Preview release - イメージの書き戻しもできるようになりました。Arduinoファームウエアの更新と`JP5`ジャンパーのショートをすると書き込みができるようになります。   
 
 ## Description
 This is a project to develop a system for preserving old 2D/2DD floppy disk data.  
