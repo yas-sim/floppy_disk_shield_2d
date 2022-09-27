@@ -49,6 +49,7 @@ class FDD {
     inline void writeGate(bool onOff);
     inline void setWriteGateSafeguard(void);
     inline void releaseWriteGateSafeguard(void);
+    inline bool isWriteProtected(void);
 };
 
 #endif

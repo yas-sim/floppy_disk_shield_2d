@@ -165,6 +165,15 @@ inline void FDD::setWriteGateSafeguard(void) {
   write_gate_safeguard = false;
 }
 
+inline bool FDD::isWriteProtected(void) {
+  head(true);
+  motor(true);
+  delay(500);
+  uint8_t wp_sts = digitalRead(FD_WP);
+  return (wp_sts == LOW) ? true : false;
+}
+
+
 // TCNT1 = 250KHz count
 // INDEX pulse = 4.33ms negative pulse
 

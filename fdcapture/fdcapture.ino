@@ -32,7 +32,7 @@ size_t g_spin_ms;         // FDD spin speed (ms)
 #define FD_SIDE1      (5)
 #define CAP_RST       (4)
 #define CAP_EN        (3)
-#define FD_WP         (2)
+#define FD_WP         (2)  // WP == LOW
 
 void debug_blink(void)
 {
@@ -372,11 +372,15 @@ void loop() {
   // WRITE command needs to be 'WR' not 'W'.
   if(cmd == 'W') {
     if(cmdBuf[2] != 'R') return;
-    // Detect FDD type (2D/2DD)
-    fdd.detect_drive_type();
-    enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
-    fdd.set_media_type(media_mode);
-    write_tracks();
+    if(fdd.isWriteProtected() == true) {
+      Serial.println(F("++WRITE_PROTECTED"));
+    } else {
+      // Detect FDD type (2D/2DD)
+      fdd.detect_drive_type();
+      enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
+      fdd.set_media_type(media_mode);
+      write_tracks();
+    }
   }
   if(cmd == 'V') {
     Serial.println(F("**Revolution calibration mode"));

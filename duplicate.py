@@ -17,16 +17,18 @@ def detect_arduino():
 
 last_line = ''
 
+def get_response(uart):
+    return uart.readline().decode(encoding='ascii', errors='ignore')
+
 def wait_response(uart, expected_response, verbose=False):
     global last_line
     count = 0
     while True:         # wait for prompt from Arduino
-        line = uart.readline() #.rstrip(b'\n').rstrip(b'\r')
+        line = get_response(uart) #.rstrip(b'\n').rstrip(b'\r')
         #if len(line)==0:
         #    continue
         if verbose:
             print(line)
-        line = line.decode(encoding='ascii', errors='ignore')
         if line[:len(expected_response)] == expected_response:
             break
         count += 1
@@ -56,7 +58,15 @@ def main(args):
 
     wait_response(uart, '++CMD')   # wait for prompt from Arduino
 
-    uart.write('+WR \n'.encode('ascii'));
+    uart.write('+WR\n'.encode('ascii'))
+    while True:
+        res = get_response(uart)
+        if res[:17] == '++WRITE_PROTECTED':
+            print('[MSG] The floppy disk in the FDD is write protected. Aborted.')
+            sys.exit(0)
+        if res[:7] != '++READY':
+            break
+
     wait_response(uart, '++READY')
 
     mode = 0            # 0: cmd mode, 1: pulse data read mode
