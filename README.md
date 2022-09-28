@@ -195,5 +195,5 @@ The other logic ICs can be either one of '74LS' or '74HC'.
 [PDF](resources/fdshield-schematics.pdf)
 
 ### FD-shield - Board design file
-![BRD](resources/fdshield-brd.svg)
+![BRD](resources/fdshield-brd.pdf)
 
