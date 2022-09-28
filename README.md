@@ -191,9 +191,5 @@ This tool measures the index hole to index hole time and show it on the screen. 
 Y1 (Xtal) = 4MHz X'tal.  
 U6 must be '74HC**U**04' (unbuffered type). The standard '74HC04' doesn't work.  
 The other logic ICs can be either one of '74LS' or '74HC'.  
-![schematics](resources/fdshield.svg)
+![schematics](resources/fdshield_sch.png)
 [PDF](resources/fdshield-schematics.pdf)
-
-### FD-shield - Board design file
-![BRD](resources/fdshield-brd.pdf)
-
