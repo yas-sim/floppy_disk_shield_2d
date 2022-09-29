@@ -1,6 +1,4 @@
-import os
 import sys
-import datetime
 import argparse
 
 # PySerial is required - pip install pyserial
@@ -113,7 +111,6 @@ def main(args):
                 wait_response(uart, '++ACK')
                 mode = 1                        # read pulse data mode
             elif line[:11] == '**TRACK_END':
-                print('\nWRITING...')
                 submit_command(uart, line)
                 wait_response(uart, '++ACK')
                 mode = 0
