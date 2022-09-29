@@ -254,7 +254,8 @@ void write_tracks(int normalize_mode) {
           if(dist >= 1) {
             if(normalize_mode == 1) {
               //dist = (dist + bit_cell_half) & (~(bit_cell-1));
-              dist = (dist+4) & 0x00f8u;      // assuming the bit cell width is 8.
+              dist = (dist+4) & 0b11111000u;      // assuming the bit cell width is 8 (2D/2DD).
+              //dist = (dist+2) & 0b11111100u;      // assuming the bit cell width is 4 (2HD).
             }
             if(total_bits + dist > spisram.SPISRAM_CAPACITY_BYTE * 8) {   // SPI SRAM overflow
               if(overflow_warning == false) {
