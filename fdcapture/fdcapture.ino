@@ -215,6 +215,8 @@ void write_tracks(int normalize_mode) {
   uint8_t mode = 0;     // Command mode
   uint8_t dist = 0;    // data pulse distance
   uint8_t bit_dt = 0;
+  uint64_t total_bits = 0L;
+  bool overflow_warning = false;
   Serial.println(F("++READY"));
   while(true) {
     readLine(cmdBuf, cmdBufSize);
@@ -227,6 +229,8 @@ void write_tracks(int normalize_mode) {
         fdd.seek(curr_trk, trk);
         fdd.side(sid);
         curr_trk = trk;
+        total_bits = 0;
+        overflow_warning = false;
         spisram.fill(0xff);
         spisram.beginWrite();
       } else if(cmdBuf[2] == 'T' && cmdBuf[8] == 'E') { // **TRACK_END
@@ -252,6 +256,15 @@ void write_tracks(int normalize_mode) {
               //dist = (dist + bit_cell_half) & (~(bit_cell-1));
               dist = (dist+4) & 0x00f8u;      // assuming the bit cell width is 8.
             }
+            if(total_bits + dist > spisram.SPISRAM_CAPACITY_BYTE * 8) {   // SPI SRAM overflow
+              if(overflow_warning == false) {
+                Serial.println("\n!!SPI-SRAM OVERFLOWED");
+                overflow_warning = true;
+              }
+              dist = 0;
+              continue;
+            }
+            total_bits += dist;
             if(cmdBuf[i] != extend_char && dist <= max_length) {
               for(uint8_t b = 0; b < dist - 1; b++) {
                 spisram.writeBit(1);
