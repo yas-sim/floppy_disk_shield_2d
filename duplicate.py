@@ -113,6 +113,7 @@ def main(args):
             elif line[:11] == '**TRACK_END':
                 submit_command(uart, line)
                 wait_response(uart, '++ACK')
+                print()
                 mode = 0
             elif line[:11] == '**COMPLETED':
                 submit_command(uart, line)
