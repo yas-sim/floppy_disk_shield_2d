@@ -20,22 +20,42 @@ last_line = ''
 def get_response(uart):
     return uart.readline().decode(encoding='ascii', errors='ignore')
 
-def wait_response(uart, expected_response, verbose=False):
+def wait_response(uart:serial.Serial, expected_response, verbose=False):
     global last_line
     count = 0
-    while True:         # wait for prompt from Arduino
-        line = get_response(uart) #.rstrip(b'\n').rstrip(b'\r')
-        #if len(line)==0:
-        #    continue
+    # wait for prompt from Arduino 
+    while count <=5:            # retry limit == 5
+        line = get_response(uart)
+        count += 1              # retry counter
+        if len(line)==0:
+            continue
+        if line[0] != '+':      # Treat the line not starting with '+' as a message line
+            print(line)
+            count -= 1          # Don't count message lines
+            continue
         if verbose:
             print(line)
-        if line[:len(expected_response)] == expected_response:
-            break
-        count += 1
-        if count >= 5:
-            print(last_line)
-            #print('_TO_', end='', flush=True)
-            break
+        if type(expected_response == list):
+            for i, res in enumerate(expected_response):
+                #print(i, res, len(res), line[:len(res)])
+                if line[:len(res)] == res:
+                    return i
+        else:
+            if line[:len(expected_response)] == expected_response:
+                return 0
+
+    # retry count exceeded the limit
+    print(last_line)
+    #print('_TO_', end='', flush=True)
+    #sys.exit(-1)
+    return -1
+
+
+def submit_command(uart:serial.Serial, cmd, verbose=False):
+    if verbose:
+        print(cmd)
+    uart.write(cmd.encode('ascii'))
+    uart.flush()
 
 
 def main(args):
@@ -58,21 +78,17 @@ def main(args):
 
     wait_response(uart, '++CMD')   # wait for prompt from Arduino
 
-    uart.write('+WR\n'.encode('ascii'))
-    while True:
-        res = get_response(uart)
-        if res[:17] == '++WRITE_PROTECTED':
-            print('[MSG] The floppy disk in the FDD is write protected. Aborted.')
-            sys.exit(0)
-        if res[:7] != '++READY':
-            break
-
-    wait_response(uart, '++READY')
+    normalize_flag = 1 if args.normalize else 0             # data pulse timing normalization flag
+    submit_command(uart, f'+WR {normalize_flag}\n')
+    res = wait_response(uart, ['++READY', '++WRITE_PROTECTED'])
+    if res == 1:
+        print('[MSG] The floppy disk in the FDD is write protected. Aborted.')
+        sys.exit(0)
 
     mode = 0            # 0: cmd mode, 1: pulse data read mode
     with open(args.input, 'rt') as f:
         while exit_flag == False:
-            line = f.readline()#.rstrip('\n').rstrip('\r')
+            line = f.readline()
             if len(line)==0:
                 continue
             items = line.split()
@@ -93,29 +109,25 @@ def main(args):
                 curr_track = int(items[1])
                 curr_side = int(items[2])
                 print(f'** TRACK WRITE {curr_track} {curr_side}')
-                uart.write((line).encode('ascii'))
-                uart.flush()
-                mode = 1                        # read pulse data mode
+                submit_command(uart, line)
                 wait_response(uart, '++ACK')
+                mode = 1                        # read pulse data mode
             elif line[:11] == '**TRACK_END':
                 print('\nWRITING...')
-                uart.write((line).encode('ascii'))
-                uart.flush()
+                submit_command(uart, line)
+                wait_response(uart, '++ACK')
                 mode = 0
-                wait_response(uart, '++ACK')
             elif line[:11] == '**COMPLETED':
-                uart.write((line).encode('ascii'))
-                uart.flush()
-                exit_flag = True
+                submit_command(uart, line)
                 wait_response(uart, '++ACK')
+                exit_flag = True
             elif mode == 1:
                 if line[0] != '~':
                     continue
                 print('.', end='', flush=True)
                 line = line.replace('C', 'B')              # !?!? Mystery. When the line including 'C', Arduino gets hang up.
                 last_line = line
-                uart.write((line).encode('ascii'))
-                uart.flush()
+                submit_command(uart, line)
                 wait_response(uart, '++ACK')
 
     uart.close()
@@ -125,9 +137,8 @@ if __name__ == '__main__':
     print('** Floppy shield - disk cloning tool')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', type=str, required=True, default=None, help='input raw bit stream file name (Default = fdshield_(DATE-TIME).raw)')
+    parser.add_argument('-i', '--input', type=str, required=True, default=None, help='input raw bit stream file name (*.raw)')
+    parser.add_argument('-n', '--normalize', action='store_true', required=None, default=False, help='perform data pulse timing normalization (default=False)')
     args = parser.parse_args()
 
     main(args)
-
-# command format "+R strack etrack mode overlap"

@@ -199,7 +199,8 @@ void trackWrite(uint32_t bits_to_write) {
 }
 
 // Write tracks
-void write_tracks(void) {
+// normalize_mode : 0=no normalize, 1=perform normalize
+void write_tracks(int normalize_mode) {
   const uint8_t encode_base = ' ';
   const uint8_t max_length = 'z'-encode_base;
   const uint8_t extend_char = '{';
@@ -247,8 +248,10 @@ void write_tracks(void) {
           if(cmdBuf[i] < ' ') continue;
           dist = cmdBuf[i] - encode_base;
           if(dist >= 1) {
-            //dist = (dist + bit_cell_half) & (~(bit_cell-1));
-            //dist = (dist+4) & 0x00f8u;
+            if(normalize_mode == 1) {
+              //dist = (dist + bit_cell_half) & (~(bit_cell-1));
+              dist = (dist+4) & 0x00f8u;      // assuming the bit cell width is 8.
+            }
             if(cmdBuf[i] != extend_char && dist <= max_length) {
               for(uint8_t b = 0; b < dist - 1; b++) {
                 spisram.writeBit(1);
@@ -322,6 +325,9 @@ void setup() {
   delay(200);
 
   spisram.clear();
+
+  Serial.println("");
+  Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
 }
 
 // Command format
@@ -330,11 +336,12 @@ void setup() {
 void loop() {
   char cmd;
 
-  Serial.println("");
-  Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
-
   Serial.println(F("++CMD"));
   readLine(cmdBuf, cmdBufSize);
+  if(cmdBuf[0] != '+') {      // Command line must start with '+'.
+    Serial.println(F("++ERR"));
+    return;
+  }
   cmd = toupper(cmdBuf[1]);
 
   if(cmd == 'R') {
@@ -343,7 +350,7 @@ void loop() {
     enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
     int start_track, end_track;
     int read_overlap;   // track read overlap (%)
-    sscanf(cmdBuf, "+%c %d %d %d %d", &cmd, &start_track, &end_track, &media_mode, &read_overlap);
+    sscanf(cmdBuf, "+R %d %d %d %d", &start_track, &end_track, &media_mode, &read_overlap);
     fdd.set_media_type(media_mode);
     Serial.println(F("**START"));
 
@@ -375,11 +382,17 @@ void loop() {
     if(fdd.isWriteProtected() == true) {
       Serial.println(F("++WRITE_PROTECTED"));
     } else {
+      uint8_t cmd;
+      int normalize_flag;      
+      sscanf(cmdBuf, "+WR %d", &normalize_flag);
       // Detect FDD type (2D/2DD)
       fdd.detect_drive_type();
       enum FDD::ENUM_DRV_MODE media_mode = FDD::ENUM_DRV_MODE::mode_2d;
       fdd.set_media_type(media_mode);
-      write_tracks();
+      if(normalize_flag) {
+        Serial.println(F("**Bit pulse timing normalizer activated."));
+      }
+      write_tracks(normalize_flag);
     }
   }
   if(cmd == 'V') {
