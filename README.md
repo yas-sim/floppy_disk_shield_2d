@@ -149,7 +149,7 @@ This tool measures the index hole to index hole time and show it on the screen. 
 ## Current Development Status
 **Done:**
 - Read floppy disk images (2D disk on 2D drive, 2DD disk on 2D deive, 2D disk on 2DD/2HD drive)
-- Write floppy disk image to floppy disk (2D is confirmed)
+- Write floppy disk image to floppy disk (2D images are tested)  
 - Drive type auto datection (2D or 2DD/2HD)
 - Drive spindle revolution measurement 
 - Generates D77mod disk images from the raw bitstream data (RAW->D77)
