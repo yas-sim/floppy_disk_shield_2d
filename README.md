@@ -51,6 +51,7 @@ The system consists of the hardware and software:
 ### Updates  
 |Date|Description|
 |-|-|
+|Sep 2022|Updated PCB design. Changed the 'Write Gate' jumper from jumper pad to jumper pin header for easy setting.|
 |Sep 2022|Added support for the image write back feature (image->fd). Arduino firmware update and closing `JP5` on the fd-capture shield are required to enable the feature.|
 |Sep 2022|Added RAW to HFE file converter (bs2hfe.py)|
 |Aug 2022|Backported data-separator and VFO algorithm from [fdc_bitstream](https://github.com/yas-sim/fdc_bitstream) project. The latest VFO algorithm improved the accuracy of the data reading / decoding.|
@@ -137,6 +138,15 @@ python bs2d77.py -i image_name.raw --abort_id
 python duplicate.py -i disk_image.raw
 ```
 
+## How to make your own FD-shield PCB (FD-shield PCBの作り方)  
+- PCB design data and the data for PCB manufacturing (Garber data and drill data) are included in this project. You can order your PCB at a PCB manufacturing service company. I used 'Fusion PCB' from Seeed Studio. (cost would be around $35 for 10 PCBs incl. delivery fee)    
+- PCB設計データとPCB製造データ(ガーバー、ドリル)はこのプロジェクトに含まれています。PCB製造サービス会社に製造を依頼してPCBを手に入れることができます。私はSeeed StudioのFusion PCBを利用しました。(10枚で4K円くらい？ 送料込み)   
+|File|Description|
+|-|-|
+|pcb_mfg_data/fdshield-dip-rev-h.zip|DIP version. Rev.H (Write Gate pin header)|
+|kicad/fdshield-dip/fdshield/fdshield.kicad_pro|KiCad design file (DIP) (ver.6)|
+|kicad/fdshield-sop/fdshield/fdshield.kicad_pro|KiCad design file (SOP) (ver.6)|
+
 ## Accessory Tools  
 1. FDD spindle motor speed calibration tool  
 This tool measures the index hole to index hole time and show it on the screen. You can tweak a variable register on the FDD control board to adjust the spindle speed.  
@@ -185,7 +195,9 @@ This tool measures the index hole to index hole time and show it on the screen. 
 ![system_diagram](resources/byte_sync.jpg)
 
 ### FD-shield - 3D view
-![3D](resources/fdshield-3d.jpg)
+![3D](resources/fdshield-3d.jpg)  
+![3D_dip](resources/fdshield_dip_revh_3d.png)  
+![3D_sop](resources/fdshield_sop_revh_3d.png)  
 
 ### FD-shield - Schematics  
 Y1 (Xtal) = 4MHz X'tal.  
