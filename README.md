@@ -144,9 +144,9 @@ python duplicate.py -i disk_image.raw
 
 |File|Description|  
 |---|---|  
-|pcb_mfg_data/fdshield-dip-rev-h.zip|DIP version. Rev.H (Write Gate pin header)|  
-|kicad/fdshield-dip/fdshield/fdshield.kicad_pro|KiCad design file (DIP) (ver.6)|  
-|kicad/fdshield-sop/fdshield/fdshield.kicad_pro|KiCad design file (SOP) (ver.6)|  
+|pcb_mfg_data/fdshield-dip-rev-h.zip|PCB manufacturing data. DIP version. Rev.H (Write Gate pin header)|  
+|kicad/fdshield-dip/fdshield/fdshield.kicad_pro|KiCad v6 design file (DIP)|  
+|kicad/fdshield-sop/fdshield/fdshield.kicad_pro|KiCad v6 design file (SOP)|  
 
 ## Accessory Tools  
 1. FDD spindle motor speed calibration tool  
