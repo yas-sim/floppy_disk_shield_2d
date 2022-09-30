@@ -141,11 +141,12 @@ python duplicate.py -i disk_image.raw
 ## How to make your own FD-shield PCB (FD-shield PCBの作り方)  
 - PCB design data and the data for PCB manufacturing (Garber data and drill data) are included in this project. You can order your PCB at a PCB manufacturing service company. I used 'Fusion PCB' from Seeed Studio. (cost would be around $35 for 10 PCBs incl. delivery fee)    
 - PCB設計データとPCB製造データ(ガーバー、ドリル)はこのプロジェクトに含まれています。PCB製造サービス会社に製造を依頼してPCBを手に入れることができます。私はSeeed StudioのFusion PCBを利用しました。(10枚で4K円くらい？ 送料込み)   
-|File|Description|
-|-|-|
-|pcb_mfg_data/fdshield-dip-rev-h.zip|DIP version. Rev.H (Write Gate pin header)|
-|kicad/fdshield-dip/fdshield/fdshield.kicad_pro|KiCad design file (DIP) (ver.6)|
-|kicad/fdshield-sop/fdshield/fdshield.kicad_pro|KiCad design file (SOP) (ver.6)|
+
+|File|Description|  
+|---|---|  
+|pcb_mfg_data/fdshield-dip-rev-h.zip|DIP version. Rev.H (Write Gate pin header)|  
+|kicad/fdshield-dip/fdshield/fdshield.kicad_pro|KiCad design file (DIP) (ver.6)|  
+|kicad/fdshield-sop/fdshield/fdshield.kicad_pro|KiCad design file (SOP) (ver.6)|  
 
 ## Accessory Tools  
 1. FDD spindle motor speed calibration tool  
