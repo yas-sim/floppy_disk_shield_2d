@@ -37,7 +37,7 @@ class FDD {
     void stepIn(void);
     void stepOut(void);
     void track00(void);
-    inline void waitIndex(void);
+    inline void waitIndex(bool falling=true);
     void seek(int current, int target);
     void side(int side);
     void motor(bool onoff);
@@ -46,7 +46,8 @@ class FDD {
     float measure_rpm();
 
     // FDD write gate control functions !! DANGER !!
-    inline void writeGate(bool onOff);
+    inline void enableWriteGate(void);
+    inline void disableWriteGate(void);
     inline void setWriteGateSafeguard(void);
     inline void releaseWriteGateSafeguard(void);
     inline bool isWriteProtected(void);

@@ -85,12 +85,16 @@ void FDD::track00(void) {
   }
 }
 
-inline void FDD::waitIndex(void) {      // wait for the index hole detection
-    int curr = HIGH;
-    int prev = readIndex();
+inline void FDD::waitIndex(bool falling) {      // wait for the index hole detection
+    uint8_t curr;
+    uint8_t prev = readIndex();
     while(true) {
       curr = readIndex();
-      if(prev==HIGH && curr==LOW) break;   // detect falling edge
+      if(falling) {
+        if(prev==HIGH && curr==LOW) break;   // detect falling edge
+      } else {
+        if(prev==LOW && curr==HIGH) break;   // detect rising edge
+      }
       prev = curr;
     }
 }
@@ -147,13 +151,12 @@ void FDD::detect_drive_type(void) {
   }
 }
 
-// false = WG disable, true = WG enable
-inline void FDD::writeGate( bool onOff ) {
-  if(onOff == false) {
-    digitalWrite(FD_WG, HIGH);   // WG can disable unconditionally
-    return;
-  }
-  //if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
+inline void FDD::disableWriteGate(void) {
+  digitalWrite(FD_WG, HIGH);   // WG can be disabled unconditionally
+}
+
+inline void FDD::enableWriteGate(void) {
+  if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
   digitalWrite(FD_WG, LOW);
 }
 

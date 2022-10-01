@@ -57,6 +57,7 @@ void SPISRAM::beginWrite(void) {
   transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)
   transfer(0x00); // Address 1
   transfer(0x00); // Address 0
+  write_count = 0;
   curr_bit_ptn = 0x80;
   curr_byte = default_val;
 }
@@ -123,6 +124,7 @@ void SPISRAM::writeBit(uint8_t dt) {
     curr_bit_ptn = 0x80;
     curr_byte = default_val;
   }
+  write_count++;
 }
 
 void SPISRAM::flush(void) {

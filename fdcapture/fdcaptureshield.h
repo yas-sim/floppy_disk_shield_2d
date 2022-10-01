@@ -6,8 +6,12 @@ class FDCaptureShield {
     FDCaptureShield();
 
     void init(void);
-    inline void enable(void);
-    inline void disable(void);
+    inline void enable_sampling_clock(void);
+    inline void disable_sampling_clock(void);
+
+    inline void connect(void);
+    inline void connect_and_standby(void);
+    inline void disconnect(void);
 }; 
 
 #define cmdBufSize (110)

@@ -115,20 +115,20 @@ void trackRead(int read_overlap) {
   spisram.hold(LOW);
   spisram.disconnect();           // Disconnect SPI SRAM from Arduino
 
-  fdd.waitIndex();
+  fdd.waitIndex(true);
 
   // Start captuering
   spisram.hold(HIGH);
-  FDCap.enable();
+  FDCap.connect();
   delay(g_spin_ms / 10);          // wait for 10% of spin
 
-  fdd.waitIndex();
+  fdd.waitIndex(true);
   delay((g_spin_ms * read_overlap) / 100);  // (overlap)% over capturing (read overlap)
 
   // Stop capturing
   digitalWrite(SPI_SS, HIGH);
 
-  FDCap.disable();
+  FDCap.disconnect();
   spisram.connect();
   spisram.endAccess();
 }
@@ -175,24 +175,41 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 
 // Write single track
 void trackWrite(uint32_t bits_to_write) {
+
+#if 0
   spisram.beginRead();
+  // SPI SRAM contents dump - debug purpose
+  for(int i=0; i<0x2000; i++) {
+    uint8_t dt = spisram.transfer(0);
+    if(dt < 0x10) Serial.print("0");
+    Serial.print(dt, HEX);
+    //if(i % 32==31) Serial.print("\n");
+  }
+  Serial.println();
+  spisram.endAccess();
+#endif
+
+  spisram.beginRead();
+
   spisram.hold(LOW);
-  spisram.disconnect();           // Disconnect SPI SRAM from Arduino
+  spisram.disconnect();            // Disconnect SPI SRAM from Arduino
 
   fdd.releaseWriteGateSafeguard(); // Release write gate safeguard
-  fdd.waitIndex();
+  FDCap.connect_and_standby();     // Enable fd-shield, keep SCK line low.
+
+  fdd.waitIndex(true);
+  fdd.enableWriteGate();           // Enable WG
 
   // Start writing
   spisram.hold(HIGH);
-  fdd.writeGate(true);            // Enable WG
-  FDCap.enable();
-  delay(g_spin_ms / 10);          // wait for 10% of spin
+  FDCap.enable_sampling_clock();   // Start supplying 4MHz clock to SCK
+  delay(g_spin_ms / 2);           // wait for 50% of spin time
 
-  fdd.waitIndex();
-  fdd.writeGate(false);           // Disable WG right after the next index hole detection
+  fdd.waitIndex(true);
+  fdd.disableWriteGate();          // Disable WG right after the next index hole detection
 
   digitalWrite(SPI_SS, HIGH);
-  FDCap.disable();
+  FDCap.disconnect();
   spisram.connect();
   spisram.endAccess();
   fdd.setWriteGateSafeguard();
@@ -226,6 +243,8 @@ void write_tracks(int normalize_mode) {
       if(cmdBuf[2] == 'T' && cmdBuf[8] == 'R') {        // **TRACK_READ 0 0
         mode = 1;   // Read track data mode
         sscanf(cmdBuf+12, "%d %d", &trk, &sid);
+        FDCap.disconnect();                             // CAP_ACTIVATE=LOW, CAP_EN=HIGH
+        spisram.connect();                              // Activate SPI_SS, SPI_SCK, SPI_MOSI, SPI_MISO
         fdd.seek(curr_trk, trk);
         fdd.side(sid);
         curr_trk = trk;
@@ -286,6 +305,52 @@ void write_tracks(int normalize_mode) {
 
 // =================================================================
 
+// Testing SPI SRAM
+void test_spi_sram(void) {
+  const uint32_t SPISRAM_CAPACITY_BYTE = 2 * 65536UL; // 1Mbit SRAM (bytes)
+
+  spisram.connect();
+
+  Serial.println(F("Testing SPI SRAM..."));
+  spisram.beginWrite();
+  for(uint64_t adr = 0; adr < SPISRAM_CAPACITY_BYTE; adr++) {
+    for(uint8_t bit = 0x80u; bit > 0; bit >>= 1) {
+      spisram.writeBit((adr & bit) ? 1 : 0);
+    }
+  }
+  spisram.flush();
+  spisram.endAccess();
+
+  uint32_t bits = spisram.getLength();
+  Serial.println(F("Write completed."));
+  Serial.print(bits);
+  Serial.println(F(" bits written."));
+
+#if 0
+  // error injection
+  spisram.beginWrite();
+  spisram.transfer(0x08);
+  spisram.endAccess();
+#endif
+
+  spisram.beginRead();
+  for(uint64_t adr = 0; adr < SPISRAM_CAPACITY_BYTE; adr++) {
+    uint8_t dt = spisram.transfer(0);
+    if(dt != (adr & 0xffu)) {
+      Serial.println(F("Compare error ("));
+      Serial.print((uint8_t)adr, HEX);
+      Serial.print(F(") : C="));
+      Serial.print((uint8_t)(adr & 0xffu), HEX);
+      Serial.print(F(" - "));
+      Serial.println(dt, HEX);
+    }
+  }
+  spisram.endAccess();
+  Serial.println(F("Test completed."));
+}
+
+
+// =================================================================
 
 // Calibrate motor speed
 void revolution_calibration(void) {
@@ -412,6 +477,9 @@ void loop() {
   if(cmd == 'V') {
     Serial.println(F("**Revolution calibration mode"));
     revolution_calibration();
+  }
+  if(cmd == 'T') {
+    test_spi_sram();
   }
   fdd.head(false);
   fdd.motor(false);

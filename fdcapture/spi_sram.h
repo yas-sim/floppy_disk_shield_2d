@@ -16,7 +16,7 @@ class SPISRAM {
     inline uint8_t transfer(uint8_t dt);
     void writeBit(uint8_t dt);
     void flush(void);
-    inline uint32_t getLength( void ) { return 0; }
+    inline uint32_t getLength( void ) { return write_count; }
     inline void hold(uint8_t state);
     void reset(void);
     inline void beginAccess(void);
