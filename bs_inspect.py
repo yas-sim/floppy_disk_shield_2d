@@ -214,15 +214,16 @@ def read_sectors(interval, spin_spd, args):
     #                            id_field = [ C, H, R, N, CRC1, CRC2, ID-CRC status, ds_pos, mfm_pos]
     parser = FormatParserIBM(interval, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     track, sec_read, sec_err = parser.read_all_sectors(abort_by_idxmark=args.abort_index, abort_by_sameid=args.abort_id)
-    print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    MFM-POS')
+    print(' # : (C ,H ,R ,N ) ID-CRC DT-CRC AM    IDAM-POS  IDAM-TIME(ms)')
     for i, sect in enumerate(track):
         idam = sect[0]
-        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {:6} {} 0x{:04x}'.format(i+1, 
+        print('{:2} : ({:02x},{:02x},{:02x},{:02x}) {:6} {:6} {} 0x{:04x} {:8.3f}'.format(i+1, 
             idam[0], idam[1], idam[2], idam[3], 
             'OK '   if idam[6] else 'ERR',
             'OK '   if sect[1] else 'ERR',
             'DAM  ' if sect[3] else 'DDAM ',
-            idam[8]))
+            idam[8],
+            idam[8] * (1e3/args.clk_spd)))
     print('OK={}, Error={}'.format(sec_read, sec_err))
 
 def ascii_dump(bit_stream, spin_spd, args):
@@ -283,10 +284,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required=True, help='input bitstream file path')
     parser.add_argument('-t', '--track', required=True, help='track number. single number or a tuple (start,end) (track # should be 0-83 for 2D, 0-163 for 2DD)')
-    parser.add_argument('--high_gain', type=float, required=False, default=1, help='data separator gain for high-speed tracking mode (default: 1)')
-    parser.add_argument('--low_gain', type=float, required=False, default=1, help='data separator gain for low-speed tracking mode (default: 1)')
+    parser.add_argument('-hg', '--high_gain', type=float, required=False, default=1, help='data separator gain for high-speed tracking mode (default: 1)')
+    parser.add_argument('-lg', '--low_gain', type=float, required=False, default=1, help='data separator gain for low-speed tracking mode (default: 1)')
     parser.add_argument('--log_level', type=int, required=False, default=0, choices=(0,1,2) ,help='log level: 0=off, 1=minimum, 2=verbose')
-    parser.add_argument('--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4000000)')
+    parser.add_argument('-cs', '--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4e6)')
+    parser.add_argument('-br', '--bit_rate', type=int, required=False, default=500e3, help='FD-shield capture clock speed (default=500KHz=500e3)')
     parser.add_argument('--histogram', action='store_true', default=False, help='display histogram of the pulse interval buffer')
     parser.add_argument('--pulse_pitch', action='store_true', default=False, help='display pulse pitch variation in a track')
     parser.add_argument('--history', action='store_true', default=False, help='display history graph of the pulse interval buffer')
