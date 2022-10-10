@@ -74,31 +74,14 @@ The [`fdc_bitstream`](https://github.com/yas-sim/fdc_bitstream) is my project th
 
 * `bs_inspect.py`  
 This tool provides featurs to analyze or check the bitstream data and its quality.  
-  * Visualize data timing history
-  * Visualize data timing histogram
-  * Read all IDs in the tracks
-  * Read all sectors in the tracks
-  * MFM data dump
-  * ASCII data dump (display pritable/readable data)
-  * Tweak parameters (VFO high/low gain value, sampling frequency, FDD spin speed) 
-
-### Bitstream visualizer  
-You can check how VFO follows the variation of pulse pitch with the bitstream visualizer.  
-The VFO tries to keep the data pulse be the center of the bit cell as much as possible by tweaking the oscillation frequency (= the bit cell width).  
-![history-good](resources/history-1.png)
-![history-bad](resources/history-2.png)  
-
-### Bitstream timing histogram viewer
-* Good case ![histogram-good](resources/histogram-good.png)
-* Bad case - Usually, this may be caused by the spindle speed fluctuation (that causes data pulse pitch variation in a track), or data written by multiple drives (written with drives with different spindle motor speeds).  
-![histogram-bad](resources/histogram-bad.png)
-  
-### Pulse (bit) pitch visualizer  
-You can check the pulse pitch fluctuation throughout a track with the pulse pitch visualizer. The stabler pitch, the easier MFM decode or data read.  
-- Stable pitch  
-![good pitch](./resources/pulse_pitch_good.png)
-- Unstable pitch. Heavily fluctuated. It's so hard to follow by the VFO. May fail data retrieving.  
-![bad pitch](./resources/pulse_pitch_bad.png)
+	* Visualize track data including address mark and sector data occupancies.
+	* Visualize data timing history.
+	* Visualize data timing histogram.
+	* Read all IDs in the tracks.
+	* Read all sectors in the tracks.
+	* MFM data dump.
+	* ASCII data dump (display pritable/readable data).
+	* Tweak parameters (VFO high/low gain value, sampling frequency, FDD spin speed) .
 
 ### Track visualizer  
 You can check the address marks and sector body overlap status with this feature. The entire track data is shown in the window. The yellow vertical line indicates the position of the index hole (it appears when you capture the track data with --read_overlap option). This feature can show the decoded MFM data at the point of the mouse cursor.   
@@ -118,7 +101,25 @@ You can check the address marks and sector body overlap status with this feature
 
 * Example of a protected track  
 ![protected](./resources/track_visualizer_protected.png)  
+
+### Bitstream visualizer  
+You can check how VFO follows the variation of pulse pitch with the bitstream visualizer.  
+The VFO tries to keep the data pulse be the center of the bit cell as much as possible by tweaking the oscillation frequency (= the bit cell width).  
+![history-good](resources/history-1.png)
+![history-bad](resources/history-2.png)  
+
+### Bitstream timing histogram viewer
+* Good case ![histogram-good](resources/histogram-good.png)
+* Bad case - Usually, this may be caused by the spindle speed fluctuation (that causes data pulse pitch variation in a track), or data written by multiple drives (written with drives with different spindle motor speeds).  
+![histogram-bad](resources/histogram-bad.png)
   
+### Pulse (bit) pitch visualizer  
+You can check the pulse pitch fluctuation throughout a track with the pulse pitch visualizer. The stabler pitch, the easier MFM decode or data read.  
+- Stable pitch  
+![good pitch](./resources/pulse_pitch_good.png)
+- Unstable pitch. Heavily fluctuated. It's so hard to follow by the VFO. May fail data retrieving.  
+![bad pitch](./resources/pulse_pitch_bad.png)
+ 
 ---------
 
 ## How to use (Image capture) - 使い方
