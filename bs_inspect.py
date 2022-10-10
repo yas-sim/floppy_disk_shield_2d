@@ -11,6 +11,7 @@ from floppylib.bitstream import bitstream
 from floppylib.dataseparator import data_separator
 from floppylib.formatparserIBM import FormatParserIBM
 from floppylib.d77image import d77_image
+from floppylib.crc import CCITT_CRC
 
 def putTextVert(img:np.array, text:str, org, fontFace, fontScale, color, thickness=1, lineType=8, bottomLeftOrigin=False):
     size, base_line = cv2.getTextSize(text, fontFace, fontScale, thickness)
@@ -262,14 +263,26 @@ def find_address_marks(mfm_buf, mc_buf, mfm_pos):
     am_list = []
     am_pos = []
     am_mfm_pos = []
+    am_crc = []
     prev_mc = False
+    crcgen = CCITT_CRC()
     for pos, (dt, mc) in enumerate(zip(mfm_buf, mc_buf)):
         if prev_mc == True and mc == False and dt & 0xf8 == 0xf8:
             am_pos.append(pos)
             am_list.append(mfm_buf[pos : pos + 8])     # extract 8 bytes from the AM
             am_mfm_pos.append(mfm_pos[pos])
+            if dt >= 0xfc:      # Check ID CRC
+                crcgen.reset()
+                crcgen.data(mfm_buf[pos : pos + 1 + 4 + 2])
+                crcval = crcgen.get()
+                if crcval == 0:
+                    am_crc.append(1)  # CRC OK
+                else:
+                    am_crc.append(0) # CRC Error
+            else:
+                am_crc.append(-1)
         prev_mc = mc
-    return (am_list, am_pos, am_mfm_pos)
+    return (am_list, am_pos, am_mfm_pos, am_crc)
 
 def find_sector_pair(am_list, am_pos_list):
     body_size_table = [ 128, 256, 512, 1024 ]
@@ -298,7 +311,7 @@ def visualize_track(bit_stream, spin_speed, args):
     global mouse_x, mouse_y
     parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
     mfm_buf, mc_buf, mfm_pos = parser.read_track()
-    am_list, am_pos, am_mfm_pos = find_address_marks(mfm_buf, mc_buf, mfm_pos)
+    am_list, am_pos, am_mfm_pos, am_crc = find_address_marks(mfm_buf, mc_buf, mfm_pos)
     sect_pairs = find_sector_pair(am_list, am_pos)
 
     canvas_size = (1600, 600)
@@ -312,14 +325,15 @@ def visualize_track(bit_stream, spin_speed, args):
     max_sect = 80
 
     # Draw address marks
-    for am, pos in zip(am_list, am_pos):
+    for am, pos, crc in zip(am_list, am_pos, am_crc):
         x = int(pos*pos2x)
         col = (0,255,0) if am[0] & 0xfc == 0xfc else (255,255,0)
         y = bottom_line + max_sect * sect_pitch_y
         cv2.line(canvas, (x, bottom_line), (x, y), col, 1)
-        if am[0] > 0xfc:
+        if am[0] >= 0xfc:
             id_text = f'{am[1]:02X} {am[2]:02X} {am[3]:02X} {am[4]:02X} '
-            putTextVert(canvas, id_text, (x, bottom_line), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+            col = (255,255,255) if crc == 1 else (0,0,255)
+            putTextVert(canvas, id_text, (x, bottom_line), cv2.FONT_HERSHEY_PLAIN, 1, col, 1)
 
     # Draw sector pairs
     sect_count = 1
@@ -331,15 +345,36 @@ def visualize_track(bit_stream, spin_speed, args):
         am1_mfm_x = int(am1_mfm_pos * mfm2x)
         y = bottom_line + sect_count * sect_pitch_y
         cv2.line(canvas, (am0_mfm_x, y), (am1_mfm_x, y), (128,128,128), 1)
+
+        # Data CRC test by reading the sector
+        sect_num = am_list[am0idx][3]  # sector number ([AM, C, H, R, N])
+        status = parser.read_sector(sect_num, am0_mfm_pos - int((args.clk_spd/args.bit_rate) * 8 * 2))
+        sts_crc = True if status[1] == False else False     # Data CRC - memo: This loop is for paired AM that should have a sector body. No RNF should occur. 
         # Sector body
         mfm_idx = am_pos[am1idx] + sect_size
+        if sts_crc == True:
+            col = (255,0,255)
+        else:
+            col = (255,255,0)
         if len(mfm_pos) > mfm_idx:
             sect_body_end_mfm_pos = mfm_pos[am_pos[am1idx] + sect_size]
         else:
             sect_body_end_mfm_pos = len(bit_stream)
         sect_body_end_x = int(sect_body_end_mfm_pos * mfm2x)
-        cv2.line(canvas, (am1_mfm_x, y), (sect_body_end_x, y), (255,255,0), 2)
+        cv2.line(canvas, (am1_mfm_x, y), (sect_body_end_x, y), col, 2)
         sect_count += 1
+
+    paird_am_list = []
+    for pair_indices, sect_size in sect_pairs:
+        paird_am_list.append(pair_indices[0])
+        paird_am_list.append(pair_indices[1])
+    for am_idx in range(len(am_list)):
+        if am_idx not in paird_am_list:
+            if am_list[am_idx][0] & 0xfc >= 0xfc:
+                x = int(am_mfm_pos[am_idx] * mfm2x)
+                y = int(bottom_line + sect_count * sect_pitch_y)
+                cv2.drawMarker(canvas, (x, y), (0, 0, 255), cv2.MARKER_TILTED_CROSS, 8, 2)
+                sect_count += 1
 
     cv2.line(canvas, (0, bottom_line), (canvas_size[0], bottom_line), (255,255,255), 1)
     cv2.line(canvas, (index_hole_x, 0), (index_hole_x, canvas_size[1]), (0,255,255), 1)
@@ -351,9 +386,17 @@ def visualize_track(bit_stream, spin_speed, args):
     key = 0
     last_text_size = [0,0]
     last_text_base_line = 0
+    cv2.putText(canvas, 'Hit \'q\' or ESC to quit.', (0,20), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+
+    print('Red ID               : ID CRC Error')
+    print('Green virtical line  : ID AM / Index AM')
+    print('Cyan virtical line   : DAM / DDAM')
+    print('Red cross mark       : Record not found error')
+    print('Yellow virtical line : Index hole')
+
     while key != 27 and key != ord('q'):
         pos = int((mouse_x * len(mfm_buf)) / canvas_size[0])
-        dump_data = ''
+        dump_data = f'{pos:04X} : '
         for ofst in range(32):
             if pos + ofst < len(mfm_buf):
                 mc_str = '*' if mc_buf[pos + ofst] else ' '
@@ -364,7 +407,7 @@ def visualize_track(bit_stream, spin_speed, args):
         cv2.putText(canvas, dump_data, (0, y + 24), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
         last_text_size, last_text_base_line = cv2.getTextSize(dump_data, cv2.FONT_HERSHEY_PLAIN, 1, 1)
         cv2.imshow(canvas_name, canvas)
-        key = cv2.waitKey(30)
+        key = cv2.waitKey(100)
 
 
 def main(args):

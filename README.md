@@ -103,6 +103,13 @@ You can check the pulse pitch fluctuation throughout a track with the pulse pitc
 ### Track visualizer  
 You can check the address marks and sector body overlap status with this feature. The entire track data is shown in the window. The yellow vertical line indicates the position of the index hole (it appears when you capture the track data with --read_overlap option). This feature can show the decoded MFM data at the point of the mouse cursor.   
 
+* Legend:  
+	* Red ID               : ID CRC Error
+	* Green virtical line  : ID AM / Index AM
+	* Cyan virtical line   : DAM / DDAM
+	* Red cross mark       : Record not found error
+	* Yellow virtical line : Index hole  
+<br>  
 * Example of a normal track  
 ![normal](./resources/track_visualizer_normal.png)  
 
