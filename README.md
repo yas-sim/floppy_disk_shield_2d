@@ -107,6 +107,8 @@ You can check the address marks and sector body overlap status with this feature
 	* Red ID               : ID CRC Error
 	* Green virtical line  : ID AM / Index AM
 	* Cyan virtical line   : DAM / DDAM
+	* Cyan horizontal line : Sector data (normal)
+	* Magenta horizontal line : Sector data (Data CRC error)
 	* Red cross mark       : Record not found error
 	* Yellow virtical line : Index hole  
 <br>  
