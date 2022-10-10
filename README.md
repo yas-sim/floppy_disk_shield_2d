@@ -110,6 +110,7 @@ You can check the address marks and sector body overlap status with this feature
 	* Red cross mark       : Record not found error
 	* Yellow virtical line : Index hole  
 <br>  
+
 * Example of a normal track  
 ![normal](./resources/track_visualizer_normal.png)  
 
