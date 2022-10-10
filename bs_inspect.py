@@ -344,7 +344,7 @@ def visualize_track(bit_stream, spin_speed, args):
         am0_mfm_x = int(am0_mfm_pos * mfm2x)
         am1_mfm_x = int(am1_mfm_pos * mfm2x)
         y = bottom_line + sect_count * sect_pitch_y
-        cv2.line(canvas, (am0_mfm_x, y), (am1_mfm_x, y), (128,128,128), 1)
+        cv2.line(canvas, (am0_mfm_x, y), (am1_mfm_x, y), (256,256,128), 1)
 
         # Data CRC test by reading the sector
         sect_num = am_list[am0idx][3]  # sector number ([AM, C, H, R, N])
@@ -382,10 +382,7 @@ def visualize_track(bit_stream, spin_speed, args):
     canvas_name = 'track'
     cv2.namedWindow(canvas_name)
     cv2.setMouseCallback(canvas_name, mouse_event)
-    cv2.imshow(canvas_name, canvas)
-    key = 0
-    last_text_size = [0,0]
-    last_text_base_line = 0
+
     cv2.putText(canvas, 'Hit \'q\' or ESC to quit.', (0,20), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
 
     print('Red ID               : ID CRC Error')
@@ -394,18 +391,31 @@ def visualize_track(bit_stream, spin_speed, args):
     print('Red cross mark       : Record not found error')
     print('Yellow virtical line : Index hole')
 
+    key = 0
+    last_dump_size = [0,0]
+    last_ascii_size = [0,0]
     while key != 27 and key != ord('q'):
         pos = int((mouse_x * len(mfm_buf)) / canvas_size[0])
         dump_data = f'{pos:04X} : '
+        ascii_data = '       '
         for ofst in range(32):
             if pos + ofst < len(mfm_buf):
                 mc_str = '*' if mc_buf[pos + ofst] else ' '
-                dt_str = f'{mfm_buf[pos + ofst]:02X}'
+                dt = mfm_buf[pos + ofst]
+                dt_str = f'{dt:02X}'
                 dump_data += mc_str + dt_str + ' '
+                ascii_data += chr(dt) if dt >= 0x20 and dt <= 0x7e else '.'
+
         y = bottom_line + max_sect * sect_pitch_y
-        cv2.rectangle(canvas, (0, y), (last_text_size[0], y + 32), (0,0,0), -1)
-        cv2.putText(canvas, dump_data, (0, y + 24), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
-        last_text_size, last_text_base_line = cv2.getTextSize(dump_data, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        cv2.rectangle(canvas, (0, y), (last_dump_size[0], y + 24), (0,0,0), -1)
+        cv2.putText(canvas, dump_data, (0, y + 16), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        last_dump_size, _ = cv2.getTextSize(dump_data, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+
+        y = bottom_line + max_sect * sect_pitch_y + 16
+        cv2.rectangle(canvas, (0, y), (last_ascii_size[0], y + 24), (0,0,0), -1)
+        cv2.putText(canvas, ascii_data, (0, y + 16), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        last_ascii_size, _ = cv2.getTextSize(ascii_data, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+
         cv2.imshow(canvas_name, canvas)
         key = cv2.waitKey(100)
 
