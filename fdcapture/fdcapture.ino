@@ -10,9 +10,14 @@
 #include "spi_sram.h"
 #include "fdcaptureshield.h"
 
+#if !defined(__AVR_ATmega328P__)
+#error This program can only run on Arduino Uno.
+#endif
+
 uint8_t cmdBuf[cmdBufSize+1];
-  
-size_t g_spin_ms;         // FDD spin speed (ms)
+
+uint16_t g_spin_tick;          // FDD spin time (Timer 1 tick count @ 250KHz)
+uint32_t g_calibrated_clock;   // Calibrated timer1 clock
 
 // GPIO mapping
 #define FD_WG         (A5)   // Write gate signal !!DANGER!!
@@ -109,30 +114,37 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
 
 
 // Read single track
-// read_overlap: overlap percentage to a spin. '5' means +5% (in total 105%) of 1 spin time.
-void trackRead(int read_overlap) {
+void trackRead(uint16_t capture_tick_count) {
   spisram.beginWrite();
   spisram.hold(LOW);
-  spisram.disconnect();           // Disconnect SPI SRAM from Arduino
+  spisram.disconnect();                              // Disconnect SPI SRAM from Arduino
 
-  fdd.waitIndex(true);
+  noInterrupts();
+  uint8_t TCCR1A_bkup = TCCR1A;
+  uint8_t TCCR1B_bkup = TCCR1B;
+  TCCR1A &= 0xfc;            // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+  TCCR1B  = 0x03;            // Timer1, WGM13,WGM12 = 0,0 / CS12,CS11,CS10 = 0,1,1 = clkIO/64
+
+  MACRO_WAIT_INDEX();                                // wait for next index pulse
+  TCNT1 = 0;                                         // Reset timer counter
 
   // Start captuering
-  spisram.hold(HIGH);
-  FDCap.connect();
-  delay(g_spin_ms / 10);          // wait for 10% of spin
+  MACRO_DISABLE_SPI_HOLD();
+  MACRO_FDCAP_CONNECT();
 
-  fdd.waitIndex(true);
-  delay((g_spin_ms * read_overlap) / 100);  // (overlap)% over capturing (read overlap)
+  while(TCNT1 < capture_tick_count) /* NOP */ ;
 
   // Stop capturing
-  digitalWrite(SPI_SS, HIGH);
+  MACRO_DISABLE_SAMPLING_CLOCK();
+
+  TCCR1A = TCCR1A_bkup;
+  TCCR1B = TCCR1B_bkup;
+  interrupts();
 
   FDCap.disconnect();
   spisram.connect();
   spisram.endAccess();
 }
-
 
 // Read tracks  (track # = 0-79 (,83))
 void read_tracks(int start_track, int end_track, int read_overlap) {
@@ -140,11 +152,12 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 
   Serial.print("**SAMPLING_RATE 4000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
 
-  const unsigned long capture_capacity_byte = 
-    (unsigned long)((float)spisram.SPI_CLK * (float)g_spin_ms * ((float)(read_overlap+100)/100.f) ) / 8 / 1000;
+  uint32_t capture_tick_count = ((100 + (uint32_t)read_overlap) * (uint32_t)g_spin_tick) / 100;
+  if(capture_tick_count > 0xffffu) capture_tick_count = 0xffffu;
+  uint32_t capture_capacity_byte = ((4e6 / g_calibrated_clock) * capture_tick_count) / 8;
+
   Serial.print(";CAPACITY[bytes]:");
-  Serial.print(capture_capacity_byte);
-  Serial.print("\n");
+  Serial.println(capture_capacity_byte);
 
   size_t curr_trk = 0;
   for (size_t trk = start_track; trk <= end_track; trk++) {
@@ -161,7 +174,7 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
     Serial.print(F(" "));
     Serial.println(fdd_side);
 
-    trackRead(read_overlap);
+    trackRead(capture_tick_count);
 
     dumpTrack_encode(capture_capacity_byte);    // Dump captured data
     //dumpTrack_encode(TRACK_CAPACITY_BYTE);    // SPI SRAM full dump
@@ -173,8 +186,21 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
 // =================================================================
 
 
+uint8_t count_space_chars(uint8_t *str) {
+  uint8_t count = 0;
+  uint8_t prev = '\0';
+  while(*str != '\0') {
+    if(*str == ' ' && prev != ' ') {
+      count++;
+    }
+    prev = *str++;
+    if(count > 10) break;   // safeguard
+  }
+  return count;
+}
+
 // Write single track
-void trackWrite(uint32_t bits_to_write) {
+void trackWrite(uint32_t bits_to_write, uint16_t time_out_tick=0 /* 1tick=250KHz */) {
 
 #if 0
   spisram.beginRead();
@@ -190,29 +216,40 @@ void trackWrite(uint32_t bits_to_write) {
 #endif
 
   spisram.beginRead();
-
   spisram.hold(LOW);
-  spisram.disconnect();            // Disconnect SPI SRAM from Arduino
+  spisram.disconnect();              // Disconnect SPI SRAM from Arduino
 
-  fdd.releaseWriteGateSafeguard(); // Release write gate safeguard
-  FDCap.connect_and_standby();     // Enable fd-shield, keep SCK line low.
+  noInterrupts();
+  uint8_t TCCR1A_bkup = TCCR1A;
+  uint8_t TCCR1B_bkup = TCCR1B;
+  TCCR1A &= 0xfc;            // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+  TCCR1B  = 0x03;            // Timer1, WGM13,WGM12 = 0,0 / CS12,CS11,CS10 = 0,1,1 = clkIO/64
 
-  fdd.waitIndex(true);
-  fdd.enableWriteGate();           // Enable WG
+  MACRO_FDCAP_CONNECT_AND_STANDBY();          // Enable fd-shield, keep SCK line low.
+
+  MACRO_WAIT_INDEX();
+  TCNT1 = 0;                                  // Reset timer counter
 
   // Start writing
-  spisram.hold(HIGH);
-  FDCap.enable_sampling_clock();   // Start supplying 4MHz clock to SCK
-  delay(g_spin_ms / 2);           // wait for 50% of spin time
+  MACRO_ENABLE_WG();                          // Enable WG
+  MACRO_DISABLE_SPI_HOLD();
+  MACRO_ENABLE_SAMPLING_CLOCK();              // Start supplying 4MHz clock to SCK
 
-  fdd.waitIndex(true);
-  fdd.disableWriteGate();          // Disable WG right after the next index hole detection
+  if(time_out_tick == 0) {
+    MACRO_WAIT_INDEX();                       // wait for next index pulse
+  } else {
+    while(TCNT1 < time_out_tick) /* NOP */ ;  // Wait until specified time passed
+  }
+  MACRO_DISABLE_WG();                         // Disable WG right after the next index hole detection
+
+  TCCR1A = TCCR1A_bkup;                       // Restore timer1 setting
+  TCCR1B = TCCR1B_bkup;
+  interrupts();
 
   digitalWrite(SPI_SS, HIGH);
   FDCap.disconnect();
   spisram.connect();
   spisram.endAccess();
-  fdd.setWriteGateSafeguard();
 }
 
 // Write tracks
@@ -227,6 +264,7 @@ void write_tracks(int normalize_mode) {
   fdd.track00();
   int curr_trk = 0;
   int trk, sid;
+  unsigned int write_bits = 0;   // number of bits to write
   uint8_t test = 0;
 
   uint8_t mode = 0;     // Command mode
@@ -234,6 +272,16 @@ void write_tracks(int normalize_mode) {
   uint8_t bit_dt = 0;
   uint64_t total_bits = 0L;
   bool overflow_warning = false;
+
+  // Measure spindle spin time (1 tick = 250KHz)
+  uint32_t spin_time_tick = 0;
+  for(int i = 0; i < 4; i++) {
+    spin_time_tick += fdd.measure_rpm_tick();
+  }
+  spin_time_tick /= 4;
+  Serial.print("#SPIN_TIME_TICK $");
+  Serial.println(spin_time_tick, HEX);
+
   Serial.println(F("++READY"));
   while(true) {
     readLine(cmdBuf, cmdBufSize);
@@ -242,7 +290,12 @@ void write_tracks(int normalize_mode) {
     if(cmdBuf[0] == '*' && cmdBuf[1] == '*') {          // CMD
       if(cmdBuf[2] == 'T' && cmdBuf[8] == 'R') {        // **TRACK_READ 0 0
         mode = 1;   // Read track data mode
-        sscanf(cmdBuf+12, "%d %d", &trk, &sid);
+        if(count_space_chars(cmdBuf) == 3) {
+          sscanf(cmdBuf+12, "%d %d %d", &trk, &sid, &write_bits); // write will finish after (write_bits) written
+        } else {
+          sscanf(cmdBuf+12, "%d %d", &trk, &sid);
+          write_bits = 0;                               // Write will finish on 2nd index hole detection
+        }
         FDCap.disconnect();                             // CAP_ACTIVATE=LOW, CAP_EN=HIGH
         spisram.connect();                              // Activate SPI_SS, SPI_SCK, SPI_MOSI, SPI_MISO
         fdd.seek(curr_trk, trk);
@@ -257,7 +310,12 @@ void write_tracks(int normalize_mode) {
         spisram.flush();
         spisram.endAccess();
         uint32_t bits = spisram.getLength();
-        trackWrite(bits);
+        trackWrite(bits, write_bits);
+        if(write_bits > 0) {
+          Serial.print(F("\n#$"));
+          Serial.print(write_bits, HEX);
+          Serial.println(F(" written."));
+        }
       } else if(cmdBuf[2] == 'M' && cmdBuf[8] == 'T') { // **MEDIA_TYPE
       } else if(cmdBuf[2] == 'S' && cmdBuf[7] == 'S') { // **SPIN_SPD 0.199
       } else if(cmdBuf[2] == 'O' && cmdBuf[6] == 'L') { // **OVERLAP 0
@@ -355,7 +413,7 @@ void test_spi_sram(void) {
 // Calibrate motor speed
 void revolution_calibration(void) {
   float spin;
-  while (1) {
+  while(true) {
     spin = fdd.measure_rpm();
     Serial.println(spin * 1000, DEC); // ms
   }
@@ -364,13 +422,15 @@ void revolution_calibration(void) {
 // Measure FDD spindle speed (measure time for 5 spins)
 void report_spindle_speed(void) {
     float spin = 0.f;
+    uint32_t spin_tick = 0;
     for(int i=0; i<5; i++) {
-      spin += fdd.measure_rpm();
+      spin_tick += fdd.measure_rpm_tick();
     }
-    spin /= 5;
+    spin_tick /= 5;
+    spin = (double)spin_tick / (double)g_calibrated_clock;
     Serial.print(F("**SPIN_SPD "));
-    Serial.println(spin,8);
-    g_spin_ms = (int)(spin*1000);
+    Serial.println(spin, 8);
+    g_spin_tick = spin_tick;
 }
 
 // =================================================================
@@ -407,6 +467,7 @@ void setup() {
 
   Serial.println("");
   Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
+  g_calibrated_clock = 250e3;                     // Default clock for timer1
 }
 
 // Command format
@@ -439,10 +500,9 @@ void loop() {
 
     report_spindle_speed();
 
-    int max_capture_time_ms = (int)(((spisram.SPISRAM_CAPACITY_BYTE*8.f) / spisram.SPI_CLK)*1000.f);
-    int capture_time_ms     = (int)(g_spin_ms * (1.f + read_overlap/100.f));
-    if(capture_time_ms > max_capture_time_ms) {
-      read_overlap = (int)((((float)max_capture_time_ms / (float)g_spin_ms) - 1.f) * 100.f);
+    uint32_t sampling_tick_count = ((100 + (uint32_t)read_overlap) * (uint32_t)g_spin_tick) / 100;
+    if(sampling_tick_count > 0xffffu) {
+      read_overlap = (int)(((double)0x10000 / (double)g_spin_tick) * 100.f - 100.f);
       Serial.print(F("##READ_OVERLAP IS LIMITED TO "));
       Serial.print(read_overlap);
       Serial.println(F("% BECAUSE THE AMOUNT OF CAPTURE DATA EXCEEDS THE MAX SPI-SRAM CAPACITY."));
@@ -457,12 +517,14 @@ void loop() {
   }
   // WRITE command needs to be 'WR' not 'W'.
   if(cmd == 'W') {
+    fdd.head(true);
+    fdd.motor(true);
     if(cmdBuf[2] != 'R') return;
     if(fdd.isWriteProtected() == true) {
       Serial.println(F("++WRITE_PROTECTED"));
     } else {
       uint8_t cmd;
-      int normalize_flag;      
+      int normalize_flag;
       sscanf(cmdBuf, "+WR %d", &normalize_flag);
       // Detect FDD type (2D/2DD)
       fdd.detect_drive_type();
@@ -475,12 +537,100 @@ void loop() {
     }
   }
   if(cmd == 'V') {
+    fdd.head(true);
+    fdd.motor(true);
     Serial.println(F("**Revolution calibration mode"));
     revolution_calibration();
+  }
+  if(cmd == 'C') {
+    fdd.head(true);
+    fdd.motor(true);
+    uint16_t tick;
+    uint32_t ttl_tick = 0;
+    const uint8_t niter = 5;
+    for(int i=0; i < niter; i++) {
+      tick = fdd.measure_rpm_tick();
+      ttl_tick += tick;
+    }
+    tick = ttl_tick / niter;
+    Serial.print(F("++SPIN_TICK "));
+    Serial.println(tick, DEC); // ms
   }
   if(cmd == 'T') {
     test_spi_sram();
   }
-  fdd.head(false);
-  fdd.motor(false);
+  if(cmd == 'S') {    // Set timer clock (for timer 1 calibration)
+    unsigned long calibrated_clock;
+    sscanf(cmdBuf, "+S %ld", &calibrated_clock);
+    g_calibrated_clock = calibrated_clock;
+    Serial.print(F("#CALIBRATED CLOCK="));
+    Serial.println(g_calibrated_clock);
+  }
+  if(cmd == 'M') {
+    // Measure timer1 clock speed for calibration
+    noInterrupts();
+    uint8_t TCCR1A_bkup = TCCR1A;
+    uint8_t TCCR1B_bkup = TCCR1B;
+    TCCR1A = 0x00;                    // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+    TCCR1B = 0x03;                    // Timer1, WGM13,WGM12 = 0,0 / CS12,CS11,CS10 = 0,1,1 = clkIO/64
+
+    Serial.print('S');
+    Serial.flush();
+    for(int i = 0; i < 40; i++) {         // 250KHz * 0x8000 * 40 = 5.24288 sec
+      TCNT1 = 0;
+      while(TCNT1 < 0x8000) /* nop */ ;   // 250KHz * 0x8000 = 0.131072 sec
+    }
+    TCCR1A = TCCR1A_bkup;                 // Restore timer1 setting
+    TCCR1B = TCCR1B_bkup;
+    Serial.print('E');
+    Serial.flush();
+    interrupts();
+  }
+  if(cmd == '@') {    // experimental code
+    noInterrupts();
+    uint8_t TCCR1A_bkup = TCCR1A;
+    uint8_t TCCR1B_bkup = TCCR1B;
+    //Serial.println(TCCR1A, BIN);
+    //Serial.println(TCCR1B, BIN);
+#if 0
+    uint16_t count;
+    while(true) {
+      count = fdd.measure_rpm_tick();
+      Serial.println(count, HEX);
+    }
+#endif
+#if 1
+    TCCR1A = 0x00;                    // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+    TCCR1B = 0x03;                    // Timer1, WGM13,WGM12 = 0,0 / CS12,CS11,CS10 = 0,1,1 = clkIO/64
+    uint16_t half_period;
+    uint32_t calibrated_clock;
+    sscanf(cmdBuf, "+@ %ld", &calibrated_clock);
+    double target_time = 0.2f;
+    half_period = calibrated_clock * target_time;
+
+    for(uint8_t i=0; i<10; i++) {
+      PORTC &= ~0x20;                 // WG_
+      TCNT1 = 0;                      // Reset timer counter
+      while(TCNT1 < half_period) /* NOP */ ;
+
+      PORTC |= 0x20;                  // WG_
+      TCNT1 = 0;                      // Reset timer counter
+      while(TCNT1 < half_period) /* NOP */ ;
+    }
+#endif
+#if 0
+  // Oscillation output by compare match -> OC1A, OC1B pins
+  TCCR1A = 0x50;  // OC1A/OC1B toggle on compare match
+  TCCR1B = 0x03 + 0x08 /* WGM13,12 = 0,1 = CTC */;
+  OCR1A = 0xffff;
+
+  while(1);
+#endif
+
+    TCCR1A = TCCR1A_bkup;             // Restore timer1 setting
+    TCCR1B = TCCR1B_bkup;
+    interrupts();
+  }
+  //fdd.head(false);
+  //fdd.motor(false);
 }

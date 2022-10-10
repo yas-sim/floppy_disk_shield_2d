@@ -43,7 +43,7 @@ def main(args):
 
         disk.append(track)
         
-        mfm_buf, mc_buf = parser.read_track()
+        mfm_buf, mc_buf, mfm_pos = parser.read_track()
         mfm.append(mfm_buf)
         mc.append(mc_buf)
 

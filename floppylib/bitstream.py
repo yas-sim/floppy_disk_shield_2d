@@ -29,7 +29,8 @@ class bitstream:
                 if '**SPIN_SPD'   in line:
                     self.spin_spd = float(line.split(' ')[1])
                 if '**TRACK_READ' in line:
-                    trk, side = [ int(v) for v in line.split(' ')[1:] ]
+                    params = [ int(v) for v in line.split(' ')[1:] ]
+                    trk, side = params[:2]
                     linebuf = ''
                 elif '**TRACK_END' in line:
                     if len(linebuf)==0:

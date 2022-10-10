@@ -3,6 +3,15 @@
 
 #define STEP_RATE     (10)  /* ms */
 
+//#define MACRO_WAIT_INDEX() { uint8_t curr, prev; prev = PINC & 0x01; while(true) { curr = PINC & 0x01; if(prev==1 && curr==0) break; prev = curr; }}
+#define MACRO_WAIT_INDEX() \
+  while((PINC & 0x01)==1) ; \
+  while((PINC & 0x01)==0) ; \
+  while((PINC & 0x01)==1) ;
+
+#define MACRO_ENABLE_WG()  PORTC &= 0b11011111;
+#define MACRO_DISABLE_WG() PORTC |= 0b00100000; 
+
 // This class changes the configuration of Timer 1 for disc rotate speed measurement purpose
 class FDD {
   private:
@@ -37,13 +46,14 @@ class FDD {
     void stepIn(void);
     void stepOut(void);
     void track00(void);
-    inline void waitIndex(bool falling=true);
+    inline void waitIndex(void);
     void seek(int current, int target);
     void side(int side);
     void motor(bool onoff);
     void head(bool onoff);
     void detect_drive_type(void);
     float measure_rpm();
+    uint16_t measure_rpm_tick();
 
     // FDD write gate control functions !! DANGER !!
     inline void enableWriteGate(void);

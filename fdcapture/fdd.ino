@@ -85,18 +85,13 @@ void FDD::track00(void) {
   }
 }
 
-inline void FDD::waitIndex(bool falling) {      // wait for the index hole detection
-    uint8_t curr;
-    uint8_t prev = readIndex();
-    while(true) {
-      curr = readIndex();
-      if(falling) {
-        if(prev==HIGH && curr==LOW) break;   // detect falling edge
-      } else {
-        if(prev==LOW && curr==HIGH) break;   // detect rising edge
-      }
-      prev = curr;
+inline void FDD::waitIndex(void) {      // wait for the index hole detection
+    uint8_t duration = 0;
+    while(readIndex() != LOW) ;
+    while(duration < 100) {   // wait for 100 consecutive 'high' period
+      if(readIndex() == LOW) duration = 0; else duration++;
     }
+    while(readIndex() == HIGH) ;
 }
 
 void FDD::seek(int current, int target) {
@@ -156,8 +151,9 @@ inline void FDD::disableWriteGate(void) {
 }
 
 inline void FDD::enableWriteGate(void) {
-  if(write_gate_safeguard == false) return;  // safeguard must be released before enabling WG
-  digitalWrite(FD_WG, LOW);
+  if(write_gate_safeguard == true) {  // safeguard must be released before enabling WG
+    digitalWrite(FD_WG, LOW);
+  }
 }
 
 inline void FDD::releaseWriteGateSafeguard(void) {
@@ -179,25 +175,30 @@ inline bool FDD::isWriteProtected(void) {
 
 // TCNT1 = 250KHz count
 // INDEX pulse = 4.33ms negative pulse
-
-float FDD::measure_rpm() {
-#if defined(__AVR_ATmega328P__)
+uint16_t FDD::measure_rpm_tick(void) {
+  uint16_t tcnt1;
   noInterrupts();
   uint8_t TCCR1A_bkup = TCCR1A;
-  TCCR1A = TCCR1A & 0xfc;   // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+  uint8_t TCCR1B_bkup = TCCR1B;
+  TCCR1A = 0x00;                    // Timer1, 16b timer, WGM11,WGM10 = 0,0 = Normal mode. default = 0,1 = PWM, Phase correct, 8-bit
+  TCCR1B = 0x03;                    // Timer1, WGM13,WGM12 = 0,0 / CS12,CS11,CS10 = 0,1,1 = clkIO/64
 
-  long tcnt1_, tcnt1;
-  waitIndex();
-  tcnt1_ = TCNT1;
-  waitIndex();
+  MACRO_WAIT_INDEX();
+  TCNT1 = 0;
+  MACRO_WAIT_INDEX();
   tcnt1 = TCNT1;
-  interrupts();
-  tcnt1 = tcnt1 > tcnt1_ ? tcnt1 - tcnt1_ : tcnt1 - tcnt1_ + 65535;
-  float spin = tcnt1 / 250e3;
 
   TCCR1A = TCCR1A_bkup;
-#else
-  float spin = 0.2f;      // Arduino boards other than 'Uno' use fixed spin value
-#endif
+  TCCR1B = TCCR1B_bkup;
+  interrupts();
+  return tcnt1;                    // Spindle spin time in TCNT1 tick count (250KHz/tick)
+}
+
+
+// TCNT1 = 250KHz count
+// INDEX pulse = 4.33ms negative pulse
+
+float FDD::measure_rpm(void) {
+  float spin = measure_rpm_tick() / 250e3;
   return spin;            // sec/spin  default=0.2sec/spin(=300rpm)
 }

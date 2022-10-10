@@ -1,5 +1,6 @@
 import sys
 import argparse
+import time
 
 # PySerial is required - pip install pyserial
 import serial
@@ -56,6 +57,34 @@ def submit_command(uart:serial.Serial, cmd, verbose=False):
     uart.flush()
 
 
+def arduino_timer_calibration(uart):
+    print('**Calibrating Arduino timer...')
+    uart.write('+M\n'.encode('ascii'))
+    while True:
+        dt = uart.read(1).decode('utf8')
+        if len(dt) == 0:
+            continue
+        if dt[0] == 'S':
+            break
+    stime = time.perf_counter()
+    while True:
+        dt = uart.read(1).decode('utf8')
+        if len(dt) == 0:
+            continue
+        if dt[0] == 'E':
+            break
+    etime = time.perf_counter()
+
+    actual = etime - stime
+    arduino_timer_clock = 250e3
+    expectation = (0x8000 * 40) / arduino_timer_clock   # == 5.24288 sec
+    ratio = expectation / actual
+    calibrated_timer_clock = arduino_timer_clock * ratio
+
+    print(f'**Calibrated clock = {calibrated_timer_clock}Hz')
+    return calibrated_timer_clock
+
+
 def main(args):
     global last_line
     # Search an Arduino and open UART
@@ -74,6 +103,12 @@ def main(args):
 
     exit_flag = False
 
+    wait_response(uart, '++CMD')   # wait for prompt from Arduino
+
+    calibrated_clock = arduino_timer_calibration(uart)      # Calibrate Arduino timer 1
+    wait_response(uart, '++CMD')   # wait for prompt from Arduino
+
+    submit_command(uart, f'+S {int(calibrated_clock)}\n')
     wait_response(uart, '++CMD')   # wait for prompt from Arduino
 
     normalize_flag = 1 if args.normalize else 0             # data pulse timing normalization flag

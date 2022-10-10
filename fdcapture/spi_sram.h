@@ -1,6 +1,9 @@
 #ifndef _SPI_SRAM_
 #define _SPI_SRAM_
 
+#define MACRO_ENABLE_SPI_HOLD()    PORTC &= 0b11101111;
+#define MACRO_DISABLE_SPI_HOLD()   PORTC |= 0b00010000;
+
 class SPISRAM {
   public:
     const uint32_t SPI_CLK = 4e6;

@@ -12,6 +12,19 @@ from floppylib.dataseparator import data_separator
 from floppylib.formatparserIBM import FormatParserIBM
 from floppylib.d77image import d77_image
 
+def putTextVert(img:np.array, text:str, org, fontFace, fontScale, color, thickness=1, lineType=8, bottomLeftOrigin=False):
+    size, base_line = cv2.getTextSize(text, fontFace, fontScale, thickness)
+    text_img = np.zeros((size[1] + base_line, size[0], 3), dtype=np.uint8)
+    cv2.putText(text_img, text, (0, size[1]), fontFace, fontScale, color, thickness, lineType, bottomLeftOrigin)
+    text_img = np.transpose(text_img, (1,0,2))
+    text_img = text_img[::-1,:,:]
+    x0 = org[0]
+    x1 = org[0]+text_img.shape[1]
+    y0 = org[1]-text_img.shape[0]
+    y1 = org[1]
+    if x0 > 0 and x1 < img.shape[1] and y0 > 0 and y1 < img.shape[0]:
+        img[y0:y1, x0:x1,:] = text_img
+
 
 def pause():
     while True:
@@ -191,7 +204,7 @@ def pulse_pitch_variation(bit_stream, sampling_rate, bit_rate):
 
 def mfm_dump(bit_stream, spin_spd, args):
     parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_spd, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
-    mfm_buf, mc_buf = parser.read_track()
+    mfm_buf, mc_buf, mfm_pos = parser.read_track()
     print('{} (0x{:x}) bytes read'.format(len(mfm_buf), len(mfm_buf)))
     parser.dumpMFM16(mfm_buf, mc_buf)
 
@@ -245,6 +258,115 @@ def ascii_dump(bit_stream, spin_spd, args):
                 print(chr(dt), end='', flush=True)
         print()
 
+def find_address_marks(mfm_buf, mc_buf, mfm_pos):
+    am_list = []
+    am_pos = []
+    am_mfm_pos = []
+    prev_mc = False
+    for pos, (dt, mc) in enumerate(zip(mfm_buf, mc_buf)):
+        if prev_mc == True and mc == False and dt & 0xf8 == 0xf8:
+            am_pos.append(pos)
+            am_list.append(mfm_buf[pos : pos + 8])     # extract 8 bytes from the AM
+            am_mfm_pos.append(mfm_pos[pos])
+        prev_mc = mc
+    return (am_list, am_pos, am_mfm_pos)
+
+def find_sector_pair(am_list, am_pos_list):
+    body_size_table = [ 128, 256, 512, 1024 ]
+    sect_list = []
+    for idx in range(len(am_list)-1):
+        if am_list[idx][0] < 0xfc:   # fd, fe, ff are id address mark
+            continue
+        for idx2 in range(idx+1, len(am_list)):
+            if am_list[idx2][0] & 0xfc == 0xf8:     # f8, f9, fa, fb are dam/ddam
+                dist = am_pos_list[idx2] - am_pos_list[idx]
+                if dist < 43 + 7:           # Sector body must be found in 43 bytes (MB8876). 6 for ID field
+                    pair_indices = (idx, idx2)
+                    sector_body_size = body_size_table[am_list[idx][4] & 0x03]
+                    sect_list.append((pair_indices, sector_body_size))
+    return sect_list        
+
+mouse_x = 0
+mouse_y = 0
+
+def mouse_event(event, x, y, flags, param):
+    global mouse_x, mouse_y
+    mouse_x = x
+    mouse_y = y
+
+def visualize_track(bit_stream, spin_speed, args):
+    global mouse_x, mouse_y
+    parser = FormatParserIBM(bit_stream, clk_spd=args.clk_spd, spin_spd=spin_speed, high_gain=args.high_gain, low_gain=args.low_gain, log_level=args.log_level)
+    mfm_buf, mc_buf, mfm_pos = parser.read_track()
+    am_list, am_pos, am_mfm_pos = find_address_marks(mfm_buf, mc_buf, mfm_pos)
+    sect_pairs = find_sector_pair(am_list, am_pos)
+
+    canvas_size = (1600, 600)
+    canvas = np.zeros((canvas_size[1], canvas_size[0], 3), dtype=np.uint8)
+    bottom_line = int(canvas_size[1] * 0.3)
+    bs_time = len(bit_stream) / args.clk_spd
+    pos2x = canvas_size[0] / len(mfm_buf)
+    mfm2x = canvas_size[0] / len(bit_stream)
+    index_hole_x = int((spin_speed * canvas_size[0]) / bs_time)     # calculate x pos of index hole
+    sect_pitch_y = 4
+    max_sect = 80
+
+    # Draw address marks
+    for am, pos in zip(am_list, am_pos):
+        x = int(pos*pos2x)
+        col = (0,255,0) if am[0] & 0xfc == 0xfc else (255,255,0)
+        y = bottom_line + max_sect * sect_pitch_y
+        cv2.line(canvas, (x, bottom_line), (x, y), col, 1)
+        if am[0] > 0xfc:
+            id_text = f'{am[1]:02X} {am[2]:02X} {am[3]:02X} {am[4]:02X} '
+            putTextVert(canvas, id_text, (x, bottom_line), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+
+    # Draw sector pairs
+    sect_count = 1
+    for sect_pair, sect_size in sect_pairs:
+        am0idx, am1idx = sect_pair
+        am0_mfm_pos = am_mfm_pos[am0idx]
+        am1_mfm_pos = am_mfm_pos[am1idx]
+        am0_mfm_x = int(am0_mfm_pos * mfm2x)
+        am1_mfm_x = int(am1_mfm_pos * mfm2x)
+        y = bottom_line + sect_count * sect_pitch_y
+        cv2.line(canvas, (am0_mfm_x, y), (am1_mfm_x, y), (128,128,128), 1)
+        # Sector body
+        mfm_idx = am_pos[am1idx] + sect_size
+        if len(mfm_pos) > mfm_idx:
+            sect_body_end_mfm_pos = mfm_pos[am_pos[am1idx] + sect_size]
+        else:
+            sect_body_end_mfm_pos = len(bit_stream)
+        sect_body_end_x = int(sect_body_end_mfm_pos * mfm2x)
+        cv2.line(canvas, (am1_mfm_x, y), (sect_body_end_x, y), (255,255,0), 2)
+        sect_count += 1
+
+    cv2.line(canvas, (0, bottom_line), (canvas_size[0], bottom_line), (255,255,255), 1)
+    cv2.line(canvas, (index_hole_x, 0), (index_hole_x, canvas_size[1]), (0,255,255), 1)
+
+    canvas_name = 'track'
+    cv2.namedWindow(canvas_name)
+    cv2.setMouseCallback(canvas_name, mouse_event)
+    cv2.imshow(canvas_name, canvas)
+    key = 0
+    last_text_size = [0,0]
+    last_text_base_line = 0
+    while key != 27 and key != ord('q'):
+        pos = int((mouse_x * len(mfm_buf)) / canvas_size[0])
+        dump_data = ''
+        for ofst in range(32):
+            if pos + ofst < len(mfm_buf):
+                mc_str = '*' if mc_buf[pos + ofst] else ' '
+                dt_str = f'{mfm_buf[pos + ofst]:02X}'
+                dump_data += mc_str + dt_str + ' '
+        y = bottom_line + max_sect * sect_pitch_y
+        cv2.rectangle(canvas, (0, y), (last_text_size[0], y + 32), (0,0,0), -1)
+        cv2.putText(canvas, dump_data, (0, y + 24), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        last_text_size, last_text_base_line = cv2.getTextSize(dump_data, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        cv2.imshow(canvas_name, canvas)
+        key = cv2.waitKey(30)
+
+
 def main(args):
     bs = bitstream()
     bs.open(args.input)
@@ -277,6 +399,8 @@ def main(args):
             ascii_dump(bit_stream, spin_speed, args)
         if args.pulse_pitch:
             pulse_pitch_variation(bit_stream, 4e6, 500e3)
+        if args.visualize_track:
+            visualize_track(bit_stream, spin_speed, args)
 
 
 if __name__ == '__main__':
@@ -289,6 +413,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_level', type=int, required=False, default=0, choices=(0,1,2) ,help='log level: 0=off, 1=minimum, 2=verbose')
     parser.add_argument('-cs', '--clk_spd', type=int, required=False, default=4e6, help='FD-shield capture clock speed (default=4MHz=4e6)')
     parser.add_argument('-br', '--bit_rate', type=int, required=False, default=500e3, help='FD-shield capture clock speed (default=500KHz=500e3)')
+    parser.add_argument('--visualize_track', action='store_true', default=False, help='visualize track data')
     parser.add_argument('--histogram', action='store_true', default=False, help='display histogram of the pulse interval buffer')
     parser.add_argument('--pulse_pitch', action='store_true', default=False, help='display pulse pitch variation in a track')
     parser.add_argument('--history', action='store_true', default=False, help='display history graph of the pulse interval buffer')

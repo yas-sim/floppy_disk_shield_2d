@@ -97,6 +97,9 @@ class FormatParserIBM:
 
         mfm_buf = []
         mc_buf  = []
+        mfm_pos = []
+
+        pos = 0
 
         ds = data_separator(self.bit_stream, clk_spd=self.clk_spd, spin_spd=self.spin_spd, high_gain=self.high_gain, low_gain=self.low_gain)    # Clock / Data separator
         ds.set_mode(0)      # AM seeking
@@ -107,7 +110,9 @@ class FormatParserIBM:
                 break
             mfm_buf.append(data)
             mc_buf.append(mc)
-        return mfm_buf, mc_buf
+            mfm_pos.append(pos)
+            pos = ds.cell_pos
+        return mfm_buf, mc_buf, mfm_pos
 
     def set_bit_stream(self, bit_stream):
         self.bit_stream = bit_stream
