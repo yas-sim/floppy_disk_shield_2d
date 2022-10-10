@@ -100,6 +100,15 @@ You can check the pulse pitch fluctuation throughout a track with the pulse pitc
 - Unstable pitch. Heavily fluctuated. It's so hard to follow by the VFO. May fail data retrieving.  
 ![bad pitch](./resources/pulse_pitch_bad.png)
 
+### Track visualizer  
+You can check the address marks and sector body overlap status with this feature. The entire track data is shown in the window. The yellow vertical line indicates the position of the index hole (it appears when you capture the track data with --read_overlap option). This feature can show the decoded MFM data at the point of the mouse cursor.   
+
+* Example of a normal track  
+![normal](./resources/track_visualizer_normal.png)  
+
+* Example of a protected track  
+![protected](./resources/track_visualizer_protected.png)  
+  
 ---------
 
 ## How to use (Image capture) - 使い方
