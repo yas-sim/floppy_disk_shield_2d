@@ -89,18 +89,22 @@ def main(args):
     global last_line
     # Search an Arduino and open UART
     print('Searching for Arduino')
+    #"""
     arduino_port = detect_arduino()
     if arduino_port is None:
         print('Arduino is not found')
         sys.exit(1)
     else:
         print('Arduino is found on "{}"'.format(arduino_port))
+    """
+    arduino_port = 'COM8'   # In case the Arduino is a kind of Arduino Uno compatible (equivalent) one. (meaning, not a genuine Arduino Uno)
+    """
     try:
         uart = serial.Serial(arduino_port, baudrate=115200, timeout=3, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
     except serial.serialutil.SerialException:
         print('ERROR : ' + arduino_port + ' is in use.')
         sys.exit(1)
-
+    
     exit_flag = False
 
     wait_response(uart, '++CMD')   # wait for prompt from Arduino
