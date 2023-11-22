@@ -7,7 +7,7 @@
 #include <avr/pgmspace.h>
 
 #include "fdd.h"
-#include "spi_sram.h"
+#include "spi_memory.h"
 #include "fdcaptureshield.h"
 
 #if !defined(__AVR_ATmega328P__)
@@ -21,7 +21,7 @@ uint32_t g_calibrated_clock;   // Calibrated timer1 clock
 
 // GPIO mapping
 #define FD_WG         (A5)   // Write gate signal !!DANGER!!
-#define SPISRAM_HOLD  (A4)
+#define SPIMEMORY_HOLD  (A4)
 #define FD_TRK00      (A3)
 #define FD_READY      (A2)
 #define CAP_ACTIVE    (A1)
@@ -51,7 +51,7 @@ void debug_blink(void)
 
 // Objects
 FDD fdd;
-SPISRAM spisram;
+SPIMEMORY spimemory;
 FDCaptureShield FDCap;
 
 const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
@@ -59,7 +59,7 @@ const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L)/8L); // 1Mbit SRAM fu
 
 void dumpTrack_encode(unsigned long bytes = 0UL) {
 
-  spisram.beginRead();
+  spimemory.beginRead();
 
   if (bytes == 0) bytes = TRACK_CAPACITY_BYTE;
 
@@ -69,7 +69,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
   int chr_count = 0;
   byte out;
   for (unsigned long i = 0; i < bytes; i++) {
-    int dt = spisram.transfer(0);
+    int dt = spimemory.transfer(0);
     const uint8_t encode_base = ' ';
     const uint8_t max_length = 'z'-encode_base;
     const uint8_t extend_char = '{';
@@ -105,7 +105,7 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
       prev = b;
     }
   }
-  spisram.endAccess();
+  spimemory.endAccess();
   Serial.println(F(""));
 }
 
@@ -115,9 +115,9 @@ void dumpTrack_encode(unsigned long bytes = 0UL) {
 
 // Read single track
 void trackRead(uint16_t capture_tick_count) {
-  spisram.beginWrite();
-  spisram.hold(LOW);
-  spisram.disconnect();                              // Disconnect SPI SRAM from Arduino
+  spimemory.beginWrite();
+  spimemory.hold(LOW);
+  spimemory.disconnect();                              // Disconnect SPI SRAM from Arduino
 
   noInterrupts();
   uint8_t TCCR1A_bkup = TCCR1A;
@@ -142,8 +142,8 @@ void trackRead(uint16_t capture_tick_count) {
   interrupts();
 
   FDCap.disconnect();
-  spisram.connect();
-  spisram.endAccess();
+  spimemory.connect();
+  spimemory.endAccess();
 }
 
 // Read tracks  (track # = 0-79 (,83))
@@ -167,7 +167,7 @@ void read_tracks(int start_track, int end_track, int read_overlap) {
     curr_trk = fdd_track;
 
     fdd.side(fdd_side);
-    spisram.clear();
+    spimemory.clear();
 
     Serial.print(F("**TRACK_READ "));
     Serial.print(fdd_track);
@@ -203,21 +203,21 @@ uint8_t count_space_chars(uint8_t *str) {
 void trackWrite(uint32_t bits_to_write, uint16_t time_out_tick=0 /* 1tick=250KHz */) {
 
 #if 0
-  spisram.beginRead();
+  spimemory.beginRead();
   // SPI SRAM contents dump - debug purpose
   for(int i=0; i<0x2000; i++) {
-    uint8_t dt = spisram.transfer(0);
+    uint8_t dt = spimemory.transfer(0);
     if(dt < 0x10) Serial.print("0");
     Serial.print(dt, HEX);
     //if(i % 32==31) Serial.print("\n");
   }
   Serial.println();
-  spisram.endAccess();
+  spimemory.endAccess();
 #endif
 
-  spisram.beginRead();
-  spisram.hold(LOW);
-  spisram.disconnect();              // Disconnect SPI SRAM from Arduino
+  spimemory.beginRead();
+  spimemory.hold(LOW);
+  spimemory.disconnect();              // Disconnect SPI SRAM from Arduino
 
   noInterrupts();
   uint8_t TCCR1A_bkup = TCCR1A;
@@ -248,8 +248,8 @@ void trackWrite(uint32_t bits_to_write, uint16_t time_out_tick=0 /* 1tick=250KHz
 
   digitalWrite(SPI_SS, HIGH);
   FDCap.disconnect();
-  spisram.connect();
-  spisram.endAccess();
+  spimemory.connect();
+  spimemory.endAccess();
 }
 
 // Write tracks
@@ -297,19 +297,19 @@ void write_tracks(int normalize_mode) {
           write_bits = 0;                               // Write will finish on 2nd index hole detection
         }
         FDCap.disconnect();                             // CAP_ACTIVATE=LOW, CAP_EN=HIGH
-        spisram.connect();                              // Activate SPI_SS, SPI_SCK, SPI_MOSI, SPI_MISO
+        spimemory.connect();                              // Activate SPI_SS, SPI_SCK, SPI_MOSI, SPI_MISO
         fdd.seek(curr_trk, trk);
         fdd.side(sid);
         curr_trk = trk;
         total_bits = 0;
         overflow_warning = false;
-        spisram.fill(0xff);
-        spisram.beginWrite();
+        spimemory.fill(0xff);
+        spimemory.beginWrite();
       } else if(cmdBuf[2] == 'T' && cmdBuf[8] == 'E') { // **TRACK_END
         mode = 0;   // Command mode
-        spisram.flush();
-        spisram.endAccess();
-        uint32_t bits = spisram.getLength();
+        spimemory.flush();
+        spimemory.endAccess();
+        uint32_t bits = spimemory.getLength();
         trackWrite(bits, write_bits);
         if(write_bits > 0) {
           Serial.print(F("\n#$"));
@@ -334,7 +334,7 @@ void write_tracks(int normalize_mode) {
               dist = (dist+4) & 0b11111000u;      // assuming the bit cell width is 8 (2D/2DD).
               //dist = (dist+2) & 0b11111100u;      // assuming the bit cell width is 4 (2HD).
             }
-            if(total_bits + dist > spisram.SPISRAM_CAPACITY_BYTE * 8) {   // SPI SRAM overflow
+            if(total_bits + dist > spimemory.SPIMEMORY_CAPACITY_BYTE * 8) {   // SPI SRAM overflow
               if(overflow_warning == false) {
                 Serial.println("\n!!SPI-SRAM OVERFLOWED");
                 overflow_warning = true;
@@ -345,12 +345,12 @@ void write_tracks(int normalize_mode) {
             total_bits += dist;
             if(cmdBuf[i] != extend_char && dist <= max_length) {
               for(uint8_t b = 0; b < dist - 1; b++) {
-                spisram.writeBit(1);
+                spimemory.writeBit(1);
               }
-              spisram.writeBit(bit_dt);         // make a pulse
+              spimemory.writeBit(bit_dt);         // make a pulse
             } else {
               for(uint8_t b = 0; b < max_length; b++) {
-                spisram.writeBit(1);            // don't make pulse
+                spimemory.writeBit(1);            // don't make pulse
               }
             }
           }
@@ -365,35 +365,35 @@ void write_tracks(int normalize_mode) {
 
 // Testing SPI SRAM
 void test_spi_sram(void) {
-  const uint32_t SPISRAM_CAPACITY_BYTE = 2 * 65536UL; // 1Mbit SRAM (bytes)
+  const uint32_t spimemory_CAPACITY_BYTE = 2 * 65536UL; // 1Mbit SRAM (bytes)
 
-  spisram.connect();
+  spimemory.connect();
 
   Serial.println(F("Testing SPI SRAM..."));
-  spisram.beginWrite();
-  for(uint64_t adr = 0; adr < SPISRAM_CAPACITY_BYTE; adr++) {
+  spimemory.beginWrite();
+  for(uint64_t adr = 0; adr < spimemory_CAPACITY_BYTE; adr++) {
     for(uint8_t bit = 0x80u; bit > 0; bit >>= 1) {
-      spisram.writeBit((adr & bit) ? 1 : 0);
+      spimemory.writeBit((adr & bit) ? 1 : 0);
     }
   }
-  spisram.flush();
-  spisram.endAccess();
+  spimemory.flush();
+  spimemory.endAccess();
 
-  uint32_t bits = spisram.getLength();
+  uint32_t bits = spimemory.getLength();
   Serial.println(F("Write completed."));
   Serial.print(bits);
   Serial.println(F(" bits written."));
 
 #if 0
   // error injection
-  spisram.beginWrite();
-  spisram.transfer(0x08);
-  spisram.endAccess();
+  spimemory.beginWrite();
+  spimemory.transfer(0x08);
+  spimemory.endAccess();
 #endif
 
-  spisram.beginRead();
-  for(uint64_t adr = 0; adr < SPISRAM_CAPACITY_BYTE; adr++) {
-    uint8_t dt = spisram.transfer(0);
+  spimemory.beginRead();
+  for(uint64_t adr = 0; adr < spimemory_CAPACITY_BYTE; adr++) {
+    uint8_t dt = spimemory.transfer(0);
     if(dt != (adr & 0xffu)) {
       Serial.println(F("Compare error ("));
       Serial.print((uint8_t)adr, HEX);
@@ -403,7 +403,7 @@ void test_spi_sram(void) {
       Serial.println(dt, HEX);
     }
   }
-  spisram.endAccess();
+  spimemory.endAccess();
   Serial.println(F("Test completed."));
 }
 
@@ -456,14 +456,14 @@ uint8_t readLine(uint8_t buf[], const uint8_t buf_size) {
 void setup() {
   // Make sure that the FD_capture board doesn't drive MOSI and SCK lines
   FDCap.init();
-  spisram.init();
+  spimemory.init();
 
   Serial.begin(115200);
 
   fdd.init();                                     // Motor on, Head load on
   delay(200);
 
-  spisram.clear();
+  spimemory.clear();
 
   Serial.println("");
   Serial.println(F("**FLOPPY DISK SHIELD FOR ARDUINO"));
