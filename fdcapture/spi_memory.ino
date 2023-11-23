@@ -10,13 +10,12 @@ SPIMEMORY::SPIMEMORY() {}
 
 void SPIMEMORY::init(void) {
   SPI.begin();
+  SPCR = 0b00010000; // MSTR=1, DORD=0, CPOL=0, CPHA=0
   digitalWrite(SPIMEMORY_HOLD, HIGH);
   pinMode(SPIMEMORY_HOLD, OUTPUT);
   //reset();
 #if SPI_MEMORY_TYPE==SPI_MEMORY_23LC1024
   setSramWriteMode();
-#elif SPI_MEMORY_TYPE==SPI_MEMORY_CY15B104Q
-  framWriteEnable();
 #endif
   setDefaultValue(0xff);
   curr_bit_ptn = 0x80;
@@ -48,6 +47,7 @@ void SPIMEMORY::framWriteEnable(void) {
   beginAccess();
   transfer(0x06); // WREN: Write enable latch
   endAccess();
+  for(int i=0; i<10; i++) asm("nop \n");
 }
 
 inline void SPIMEMORY::beginAccess(void) {
@@ -68,6 +68,9 @@ void SPIMEMORY::setSramWriteMode(void) {
 }
 
 void SPIMEMORY::beginWrite(void) {
+#if SPI_MEMORY_TYPE==SPI_MEMORY_CY15B104Q
+  framWriteEnable();
+#endif
   beginAccess();
   transfer(0x02); // Write command
   transfer(0x00); // Address 2 (Required by 1Mbit SRAM, 23LC1024)

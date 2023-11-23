@@ -174,6 +174,8 @@ inline bool FDD::isWriteProtected(void) {
 
 
 // TCNT1 = 250KHz count
+// 200ms = 50,000 counts, 65,535 counts = 262.14 ms
+//
 // INDEX pulse = 4.33ms negative pulse
 uint16_t FDD::measure_rpm_tick(void) {
   uint16_t tcnt1;

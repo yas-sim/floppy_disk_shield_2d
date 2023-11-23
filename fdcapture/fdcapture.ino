@@ -53,9 +53,11 @@ void debug_blink(void)
 FDD fdd;
 SPIMEMORY spimemory;
 FDCaptureShield FDCap;
-
-const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L)/8L); // 1Mbit SRAM full capacity
-
+#if SPI_MEMORY_TYPE == SPI_MEMORY_CY15B104Q
+const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L*4L)/8L); // 1Mbit SRAM full capacity
+#elif SPI_MEMORY_TYPE == SPI_MEMORY_23LC1024
+const unsigned long TRACK_CAPACITY_BYTE   = ((1024L*1024L*1L)/8L); // 1Mbit SRAM full capacity
+#endif
 
 void dumpTrack_encode(unsigned long bytes = 0UL) {
 
@@ -150,11 +152,18 @@ void trackRead(uint16_t capture_tick_count) {
 void read_tracks(int start_track, int end_track, int read_overlap) {
   fdd.track00();
 
-  Serial.print("**SAMPLING_RATE 4000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
+  uint32_t sampling_clock;
+#if 0
+  //Serial.print("**SAMPLING_RATE 4000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
+  sampling_clock = 4e6;
+#else
+  Serial.print("**SAMPLING_RATE 8000000\n");    // 4MHz is the default sampling rate of the Arduino FD shidld.
+  sampling_clock = 8e6;
+#endif
 
   uint32_t capture_tick_count = ((100 + (uint32_t)read_overlap) * (uint32_t)g_spin_tick) / 100;
   if(capture_tick_count > 0xffffu) capture_tick_count = 0xffffu;
-  uint32_t capture_capacity_byte = ((4e6 / g_calibrated_clock) * capture_tick_count) / 8;
+  uint32_t capture_capacity_byte = ((sampling_clock / g_calibrated_clock) * capture_tick_count) / 8;
 
   Serial.print(";CAPACITY[bytes]:");
   Serial.println(capture_capacity_byte);
@@ -430,7 +439,7 @@ void report_spindle_speed(void) {
     spin = (double)spin_tick / (double)g_calibrated_clock;
     Serial.print(F("**SPIN_SPD "));
     Serial.println(spin, 8);
-    g_spin_tick = spin_tick;
+    g_spin_tick = spin_tick;    // 250KHz tick, 200ms = 50,000 count
 }
 
 // =================================================================

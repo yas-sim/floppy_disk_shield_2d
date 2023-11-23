@@ -12,7 +12,11 @@
 class SPIMEMORY {
   public:
     const uint32_t SPI_CLK = 4e6;
-    const uint32_t SPIMEMORY_CAPACITY_BYTE = 2 * 65536UL; // 1Mbit SRAM (bytes)
+#if SPI_MEMORY_TYPE == SPI_MEMORY_CY15B104Q
+    const uint32_t SPIMEMORY_CAPACITY_BYTE = (1024UL * 1024UL * 4UL)/8; // 4Mbit FRAM (bytes)
+#elif SPI_MEMORY_TYPE == SPI_MEMORY_23LC1024
+    const uint32_t SPIMEMORY_CAPACITY_BYTE = (1024UL * 1024UL * 1UL)/8; // 1Mbit SRAM (bytes)
+#endif
     uint8_t curr_bit_ptn;
     uint8_t curr_byte;
     uint8_t default_val;   // default value for the curr_byte
